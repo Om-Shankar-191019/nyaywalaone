@@ -1,0 +1,33 @@
+Nyaywala evaluation report
+Submission      11111111-2222-4333-8444-555555555555 (attempt 2)
+Assignment      66666666-7777-4888-8999-aaaaaaaaaaaa
+Rule set        v3  add_two_integers
+Evaluation key  e4c1d2f3a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f
+Grader          2.0.0   provider onlinecompiler
+Toolchain       gcc 15.2.0  (0123456789ab)
+
+GRADE           87.14 / 100
+
+Metric                 Analyzer               Score  Weight  Contrib  Status
+---------------------------------------------------------------------------
+correctness            io_tests                1.00    0.20     2000  ok
+syntax                 compiler_warnings       1.00    0.10     1000  partial
+readability_llm        llm_review              0.00    0.00        0  unavailable
+originality            similarity_flag         0.86    0.10      857  ok
+
+- correctness: All 2 tests passed.
+- syntax: Compiled without errors. The sandbox uses a fixed compile line.
+- readability_llm: Not measured: GROQ_API_KEY is not set.
+- originality: Similarity 57% with another submission. Below the 85% review threshold.
+
+Review recommended: syntax, readability_llm
+
+Usefulness and limitations
+  This grade measures correctness against the assignment's tests, structure, memory discipline,
+  readability and originality.
+
+Limitations
+  - The optional language-model review is not configured or not enabled for this rule set.
+  - The sandbox fixes its own memory and process ceilings, so the rule set's memory and process limits were not enforced.
+
+Scores are reproducible from the evaluation key; wall-clock timings are excluded from the report hash.

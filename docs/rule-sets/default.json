@@ -1,0 +1,130 @@
+{
+  "schema_version": "1.0",
+  "problem": "add_two_integers",
+  "limits": {
+    "time_limit_s": 1,
+    "memory_limit_mb": 64,
+    "max_processes": 30
+  },
+  "on_unavailable": "renormalize",
+  "metrics": [
+    {
+      "name": "correctness",
+      "analyzer": "io_tests",
+      "weight": 0.2,
+      "params": {
+        "testset": "assignment",
+        "partial_credit": true
+      }
+    },
+    {
+      "name": "syntax",
+      "analyzer": "compiler_warnings",
+      "weight": 0.1,
+      "params": {
+        "flags": "-Wall -Wextra -std=c11",
+        "warnings_as_errors": false,
+        "penalty_per_warning": 0.1
+      }
+    },
+    {
+      "name": "structure",
+      "analyzer": "static_analysis",
+      "weight": 0.1,
+      "params": {
+        "max_cyclomatic": 8,
+        "max_function_length": 40,
+        "max_nesting": 4,
+        "scoring": "linear",
+        "min_score": 0
+      }
+    },
+    {
+      "name": "modularity",
+      "analyzer": "function_split",
+      "weight": 0.1,
+      "params": {
+        "min_functions": 2,
+        "expect_helpers": true,
+        "max_main_lines": 25
+      }
+    },
+    {
+      "name": "logical",
+      "analyzer": "edge_case_runner",
+      "weight": 0.1,
+      "params": {
+        "cases": [
+          "zero",
+          "negatives",
+          "int_overflow",
+          "whitespace"
+        ],
+        "no_oracle_cap": 0.5
+      }
+    },
+    {
+      "name": "complexity",
+      "analyzer": "complexity_estimator",
+      "weight": 0.1,
+      "params": {
+        "required": "O(1)",
+        "sizes": [
+          1,
+          10,
+          100
+        ],
+        "mode": "static",
+        "timing_evidence": false
+      }
+    },
+    {
+      "name": "memory_safety",
+      "analyzer": "memory_audit",
+      "weight": 0.1,
+      "params": {
+        "check_leaks": true,
+        "check_unchecked_alloc": true,
+        "banned_functions": [
+          "gets",
+          "strcpy",
+          "sprintf"
+        ],
+        "sanitizer_run": false
+      }
+    },
+    {
+      "name": "readability",
+      "analyzer": "style_analysis",
+      "weight": 0.1,
+      "params": {
+        "min_name_length": 3,
+        "min_comment_ratio": 0.03,
+        "max_line_length": 100
+      }
+    },
+    {
+      "name": "originality",
+      "analyzer": "similarity_flag",
+      "weight": 0.1,
+      "params": {
+        "corpus": "assignment",
+        "flag_threshold": 0.85,
+        "shingle_size": 7,
+        "num_perm": 128,
+        "seed": 42
+      }
+    },
+    {
+      "name": "readability_llm",
+      "analyzer": "llm_review",
+      "weight": 0,
+      "params": {
+        "model": "llama-3.3-70b-versatile",
+        "temperature": 0,
+        "seed": 42,
+        "advisory_only": true
+      }
+    }
+  ]
+}

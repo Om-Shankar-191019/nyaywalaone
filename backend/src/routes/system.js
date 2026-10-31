@@ -3,9 +3,12 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { prisma, pingDatabase } from '../db.js';
 import { asyncHandler, notFound, send } from '../lib/http.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { usageToday } from '../execution/budget.js';
 import { getToolchainFingerprint } from '../execution/toolchain.js';
+import { capabilitiesOf } from '../execution/provider.js';
+import { defaultsFor, zodToSchema } from '../grading/schema.js';
+import { registry } from '../grading/registry.js';
 import { runEvaluation } from '../grading/coordinator.js';
 
 export const systemRouter = Router();
@@ -47,6 +50,32 @@ systemRouter.get(
   '/meta/usage',
   requireAuth,
   asyncHandler(async (req, res) => send(res, { usage: await usageToday(config.EXECUTION_PROVIDER) })),
+);
+
+/**
+ * Day 17: the rules editor builds its form from these schemas.
+ *
+ * Sending the descriptor instead of a hand-maintained field list means the form
+ * cannot offer a parameter the analyzer does not accept, and a new parameter
+ * appears in the UI the moment the analyzer gains it.
+ */
+systemRouter.get(
+  '/meta/analyzers',
+  requireAuth,
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) =>
+    send(res, {
+      analyzers: registry.all().map((analyzer) => ({
+        name: analyzer.name,
+        supports: analyzer.supports ?? [],
+        params: zodToSchema(analyzer.paramsSchema),
+        defaults: defaultsFor(analyzer.paramsSchema),
+      })),
+      provider: {
+        name: config.EXECUTION_PROVIDER,
+        ...capabilitiesOf(config.EXECUTION_PROVIDER),
+      },
+    })),
 );
 
 /**

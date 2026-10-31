@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "note": "Every limitation a report can print lives here, so the wording is reviewed once rather than drifting across branches in coordinator.js. Changing an entry changes the report hash only when that limitation applies.",
+  "usefulness": "This grade measures correctness against the assignment's tests, structure, memory discipline, readability and originality. It does not measure whether the program is a good solution to the problem, whether the student can explain it, or whether the design would survive a change in requirements.",
+  "entries": {
+    "no_reference_solution": "No reference solution is set, so edge cases are checked for well-formed output only.",
+    "no_tests": "No test cases are attached to this assignment, so correctness and edge cases are unmeasured.",
+    "llm_unavailable": "The optional language-model review is not configured or not enabled for this rule set.",
+    "compile_error": "The program did not compile; every metric except syntax is reported as unavailable.",
+    "no_compiler_flags": "The sandbox compiles with a fixed command line and cannot be given compiler flags, so the rule set's -Wall/-Wextra diagnostics were not available. Errors are still detected.",
+    "provider_limits": "The sandbox fixes its own memory and process ceilings, so the rule set's memory and process limits were not enforced.",
+    "no_peers": "No other submissions existed when originality was measured, so that score is provisional.",
+    "no_oracle": "No reference solution was available for the generated edge cases, so their score is capped.",
+    "analyzer_failed": "At least one check could not complete and is reported as unavailable rather than as a zero.",
+    "sandbox_limits": "Runs are capped by the sandbox at 30 seconds wall time and 512 MB of memory."
+  }
+}

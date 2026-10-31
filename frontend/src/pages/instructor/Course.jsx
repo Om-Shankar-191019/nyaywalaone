@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ClipboardList, Plus } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Plus, Trash2, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { api } from '../../api/client.js';
@@ -114,6 +114,102 @@ export function InstructorCourse() {
           </form>
         </Card>
       </div>
+
+      <div className="mt-5">
+        <RosterCard courseId={courseId} />
+      </div>
     </>
+  );
+}
+
+/**
+ * The roster: who is enrolled, how much they have submitted, and when they were
+ * last active. Removing a student unenrols them - it never deletes their work,
+ * because a released grade has to stay explainable.
+ */
+function RosterCard({ courseId }) {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(null);
+
+  const rosterQuery = useQuery({
+    queryKey: ['roster', courseId],
+    queryFn: () => api.get(`/courses/${courseId}/roster`),
+  });
+
+  const remove = useMutation({
+    mutationFn: (studentId) => api.del(`/courses/${courseId}/roster/${studentId}`),
+    onSuccess: async () => {
+      setConfirming(null);
+      await queryClient.invalidateQueries({ queryKey: ['roster', courseId] });
+    },
+  });
+
+  const students = rosterQuery.data?.students ?? [];
+  const joinCode = rosterQuery.data?.course?.joinCode;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Roster"
+        description={joinCode ? `${students.length} enrolled · join code ${joinCode}` : `${students.length} enrolled`}
+        action={<Badge tone="brand"><Users aria-hidden="true" size={12} /> {students.length}</Badge>}
+      />
+
+      {rosterQuery.isError ? (
+        <div className="p-5">
+          <ErrorState error={rosterQuery.error} onRetry={rosterQuery.refetch} />
+        </div>
+      ) : students.length === 0 ? (
+        <EmptyState icon={Users} title="Nobody enrolled yet" description="Share the join code and students appear here." />
+      ) : (
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Enrolled students">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-line bg-surface-2 text-[0.6875rem] uppercase tracking-wide text-muted">
+              <tr>
+                <th scope="col" className="px-4 py-2 font-semibold">Student</th>
+                <th scope="col" className="px-3 py-2 font-semibold">Submissions</th>
+                <th scope="col" className="px-3 py-2 font-semibold">Last activity</th>
+                <th scope="col" className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {students.map((student) => (
+                <tr key={student.id}>
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-fg">{student.fullName}</p>
+                    <p className="text-[0.6875rem] text-muted">{student.email}</p>
+                  </td>
+                  <td className="px-3 py-2.5 font-mono text-xs text-fg">{student.submissionCount ?? 0}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted">
+                    {student.lastSubmissionAt ? formatDate(student.lastSubmissionAt) : 'never'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {confirming === student.id ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Button size="sm" variant="danger" loading={remove.isPending} onClick={() => remove.mutate(student.id)}>
+                          Remove
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
+                          Cancel
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Remove ${student.fullName} from the course`}
+                        onClick={() => setConfirming(student.id)}
+                      >
+                        <Trash2 aria-hidden="true" size={14} />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }

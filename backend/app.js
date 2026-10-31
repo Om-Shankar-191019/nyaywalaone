@@ -3,9 +3,10 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { config } from './src/config.js';
+import { jsonShapeGuard } from './src/lib/guards.js';
 import { errorHandler, notFoundHandler } from './src/lib/http.js';
 import { requestLogger } from './src/lib/logger.js';
-import { originCheck } from './src/lib/origin.js';
+import { isAllowedOrigin, originCheck } from './src/lib/origin.js';
 import { courseAssignmentsRouter, assignmentsRouter } from './src/routes/assignments.js';
 import { authRouter } from './src/routes/auth.js';
 import { coursesRouter } from './src/routes/courses.js';
@@ -22,17 +23,20 @@ export function createApp() {
   app.disable('x-powered-by');
 
   app.use(helmet());
+  // Delegated form: CORS needs the request to judge same-origin, the same way
+  // originCheck does, so a Vercel deployment (frontend and API on one host)
+  // works without listing its own URL in APP_ORIGIN.
   app.use(
-    cors({
-      origin(origin, callback) {
-        // No Origin header (curl, server-to-server) is not a CORS request.
-        if (!origin) return callback(null, true);
-        return callback(null, config.allowedOrigins.includes(origin));
-      },
-      credentials: true,
+    cors((req, callback) => {
+      callback(null, {
+        origin: (origin, done) => done(null, isAllowedOrigin(origin, req)),
+        credentials: true,
+      });
     }),
   );
   app.use(express.json({ limit: '256kb' }));
+  // Byte size is not shape: reject absurd nesting before any validator walks it.
+  app.use(jsonShapeGuard);
   app.use(cookieParser());
   app.use(originCheck);
   app.use(requestLogger);

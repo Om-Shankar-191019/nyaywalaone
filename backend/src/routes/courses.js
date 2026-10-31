@@ -116,10 +116,52 @@ coursesRouter.get(
       include: { student: { select: { id: true, fullName: true, email: true } } },
     });
 
+    // Day 18: a roster without activity is a list of names. One grouped query
+    // gives the counts and the last submission, which is what "has this person
+    // done anything?" actually needs.
+    const activity = await prisma.submission.groupBy({
+      by: ['studentId'],
+      where: { assignment: { courseId: course.id } },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+    const byStudent = new Map(activity.map((row) => [row.studentId, row]));
+
     return send(res, {
       course: { id: course.id, name: course.name, joinCode: course.joinCode },
-      students: students.map((row) => ({ ...row.student, enrolledAt: row.enrolledAt })),
+      students: students.map((row) => ({
+        ...row.student,
+        enrolledAt: row.enrolledAt,
+        submissionCount: byStudent.get(row.studentId)?._count?._all ?? 0,
+        lastSubmissionAt: byStudent.get(row.studentId)?._max?.createdAt ?? null,
+      })),
     });
+  }),
+);
+
+/**
+ * Remove a student from the course.
+ *
+ * Deliberately not a delete of their work: unenrolling must not destroy a
+ * submission someone may have already been graded on. The cascade is on
+ * `enrollments` only, so submissions stay attached to the assignment and the
+ * instructor can still explain a mark if the student asks.
+ */
+coursesRouter.delete(
+  '/:id/roster/:studentId',
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) => {
+    const course = await requireCourseOwner(assertUuid(req.params.id), req.user.id);
+    const studentId = assertUuid(req.params.studentId);
+
+    const deleted = await prisma.enrollment.deleteMany({ where: { courseId: course.id, studentId } });
+    if (!deleted.count) throw notFound('That student is not enrolled in this course');
+
+    await prisma.auditLog.create({
+      data: { actorId: req.user.id, action: 'roster.remove', entity: 'course', entityId: course.id, metadata: { studentId } },
+    });
+
+    return send(res, { removed: studentId });
   }),
 );
 

@@ -17,7 +17,9 @@
     "test:unit": "node --test \"tests/unit/*.test.js\"",
     "test:integration": "node --test --test-concurrency=1 \"tests/integration/*.test.js\"",
     "exec:taxonomy": "node scripts/exec-taxonomy.js",
-    "exec:smoke": "node scripts/smoke.js"
+    "exec:smoke": "node scripts/smoke.js",
+    "exec:check": "node scripts/provider-check.js",
+    "db:setup-test": "node scripts/setup-test-db.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",

@@ -1,0 +1,24 @@
+# Line endings.
+#
+# The team works on Windows and WSL, and a `.env` or `.sh` file that arrives
+# with CRLF breaks in ways that look like configuration errors: a `\r` at the end
+# of a URL makes Zod report "must be a full URL". Normalise on commit, and keep
+# Windows-only artefacts (if any are ever added) as CRLF.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Env files are read by dotenv, which tolerates CRLF but not every tool does.
+# Configuration templates are the ones that get copied and edited most.
+.env* text eol=lf
+
+# Never normalise these: they are binary, or their bytes are the deliverable.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.wasm binary
+package-lock.json -diff

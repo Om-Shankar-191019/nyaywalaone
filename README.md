@@ -1,10 +1,11 @@
-# Nyaywala — Week 2 (the grading engine)
+# Nyaywala — Weeks 1–3
 
 Rule-driven, reproducible grading for C programming assignments. This repository holds the
-**Week 1 + Week 2 deliverables** of the four-week plan: accounts, roles, courses, a themed
-shell and a proven execution sandbox, plus the grading engine — submissions, versioned rule
-sets, the coordinator, every analyzer, and a hashed evaluation key that makes a grade
-reproducible.
+**Week 1, 2 and 3 deliverables** of the four-week plan: accounts, roles, courses, a themed
+shell, a proven execution sandbox, the grading engine (submissions, versioned rule sets, the
+coordinator, every analyzer, a hashed evaluation key), and the Week 3 product surfaces — the
+report a student actually reads, the rules editor an instructor actually uses, cohort filters
+and exports, similarity review, and the hardening pass.
 
 > The project was previously called *AutoGrader*. It is **Nyaywala** everywhere now — the
 > name, the balance-scale mark on the landing page, the theme key, the package names and the
@@ -12,8 +13,10 @@ reproducible.
 
 Stack: **React 19 + Vite 6 + Tailwind 4** frontend, **Express 4** API, **PostgreSQL 16/17 +
 Prisma 7** (Rust-free client via the `pg` driver adapter; the connection string lives in
-`prisma.config.ts`, **not** in `schema.prisma`), **Judge0 CE** for compilation and execution,
-no Docker.
+`prisma.config.ts`, **not** in `schema.prisma`), and **onlinecompiler.io** for compilation and
+execution (Judge0 and Wandbox remain as alternative providers behind one seam), no Docker.
+
+Runs the same on **Windows, Linux and WSL** — see [docs/linux-wsl.md](docs/linux-wsl.md).
 
 ---
 
@@ -60,10 +63,10 @@ Everything that needs your own account or key — and the exact line to paste it
 |---|---|---|
 | 1 | Baseline audit, six ADRs, env matrix, Zod boot check, PR template | `docs/decisions.md`, `backend/src/config.js` |
 | 2 | Prisma schema v1, migration, idempotent seed, DB-ping health route | `GET /api/health` returns `db: "ok"` |
-| 3 | Register / login / refresh rotation / logout / me, rate limiting | `# pass 52` incl. replayed-token `401` |
+| 3 | Register / login / refresh rotation / logout / me, rate limiting | replayed refresh token returns `401` (tested) |
 | 4 | RBAC guards, courses, join codes, assignment skeleton, origin check | RBAC matrix in `docs/decisions.md`, tested |
 | 5 | App shell, auth state, route guards, dark / light / system theme | toggle survives a hard reload, verified |
-| 6 | Judge0 + Wandbox providers, status taxonomy, budget guard, tree-sitter, toolchain fingerprint | `docs/execution-notes.md`, measured on real runs |
+| 6 | Execution providers (now onlinecompiler.io first), status taxonomy, budget guard, tree-sitter, toolchain fingerprint | `docs/execution-notes.md`, measured on real runs |
 | 7 | Demo script, task board, tag-ready build | `docs/demo-1.md` |
 | 8 | Schema v2 (assignments, test cases, rule sets, submissions, evaluations, metric results, caches), RFC 8785 canonicalisation, `rules_hash` / `testset_hash`, publish guard | `grading/canonical.js` + `tests/unit/grading.test.js` |
 | 9 | Submission endpoint (`.c`, 64 KB, normalised), attempt numbering, `evaluation_key` dedupe, status machine, `202` + poll | `routes/submissions.js`, `services/submission-service.js` |
@@ -72,13 +75,19 @@ Everything that needs your own account or key — and the exact line to paste it
 | 12 | Edge-case generators (overflow, whitespace, boundary, …), oracle with caching, `no_oracle_cap` | `grading/generators.js`, `grading/oracle.js` |
 | 13 | Memory audit (possible leaks, banned calls, fixed buffers) and complexity estimator (`O(1)` … `O(2^n)`) | `analysis/c-patterns.js`, `analysis/complexity.js` |
 | 14 | Coordinator (gate, ordered dispatch, `on_unavailable`, integer contributions, `report_hash`), JSON + text reports, regrade with lineage | `grading/coordinator.js`, `GET /submissions/:id/report(.txt)` |
+| 15 | Submission flow: `202` + polling with backoff, client-side validation, upload preview, submit disabled while a run is in flight | `pages/student/Assignment.jsx`, `lib/validation.js` |
+| 16 | Report page: metric breakdown, source/reference diff, `.txt`/`.json` download, print stylesheet, copyable `report_hash`, a11y pass | `pages/student/Report.jsx` |
+| 17 | Rules editor: schema-driven metric fields, live weight total with publish guard, publish diff against the active version, bulk paste of test cases | `pages/instructor/Assignment.jsx` |
+| 18 | Cohort table: filters, pagination, CSV export, roster with per-student activity, audit/activity feed | `GET /assignments/:id/submissions`, `/export.csv`, `/activity`, `/courses/:id/roster` |
+| 19 | Similarity: batch scan, pair review with acknowledge/flag, archived matches, instructor UI | `POST /assignments/:id/similarity/scan`, `PATCH /similarity/:matchId/review` |
+| 20 | `style` + `llm_review` analyzers, versioned limitations file inside the report, golden text-report snapshots | `grading/analyzers/style.js`, `tests/fixtures/report-view.js` |
+| 21 | Hardening: request-shape guard, binary/oversize upload checks, per-route rate limits, origin fix for deployed hosts, `docs/security.md` | `src/lib/guards.js`, `docs/security.md` |
 
 **Exit criterion met:** the same submission evaluated twice returns the same `report_hash`
-and the same grade; `npm test` reports `# pass 52, # fail 0, # cancelled 0`.
+and the same grade; `npm test` reports `# pass 76, # fail 0, # cancelled 0`.
 
-Not in this build, by design: the Week 3–4 surfaces — similarity review UI polish, the golden
-determinism corpus, the batch queue, `docs/security.md`, CI. Parts of Week 3 (grade release,
-CSV export, the report page) are already implemented because the grading flow needed them.
+Not in this build, by design: Week 4 — the batch queue and cron drain, per-cohort analytics,
+CI. `POST /api/internal/drain` exists but stays 404 until `CRON_SECRET` is set.
 
 ---
 
@@ -108,10 +117,12 @@ CSV export, the report page) are already implemented because the grading flow ne
 │   │   ├── grading/          coordinator, rules, canonical, score, registry, versions,
 │   │   │                     generators, oracle, diagnostics + analyzers/
 │   │   ├── analysis/         C metrics, c-patterns, complexity, loader
-│   │   ├── execution/        provider seam, judge0, wandbox, status, limits, budget, toolchain
-│   │   └── lib/              http envelope, hash, rate limit, origin, logger
-│   └── tests/                unit + integration (node:test, supertest)
-├── docs/                     decisions, execution-notes, demo-1, task-board
+│   │   ├── execution/        provider seam, onlinecompiler, judge0, wandbox, status, limits,
+│   │   │                     budget, toolchain
+│   │   └── lib/              http envelope, hash, rate limit, origin, guards, logger
+│   └── tests/                unit + integration (node:test, supertest), golden report fixtures
+├── docs/                     decisions, execution-notes, demo-1, task-board, security,
+│                             linux-wsl, vercel, rule-sets/
 ├── CREDENTIALS-NEEDED.md     every secret, where to get it, where it goes
 ├── vercel.json               services + rewrites
 └── .gitignore
@@ -148,6 +159,9 @@ All routes are under `/api`. Every response is `{ data }` or `{ error: { code, m
 | `PATCH` | `/submissions/:id/release` | owner | Release or hide grades |
 | `GET` | `/assignments/:id/export.csv` | owner | Cohort CSV export |
 | `GET` | `/assignments/:id/similarity` | owner | Similarity matches for the assignment |
+| `POST` | `/assignments/:id/similarity/scan` | owner | Batch scan: compare every submission pair, store new matches |
+| `PATCH` | `/similarity/:matchId/review` | owner | Record the human decision on a flagged pair |
+| `GET` | `/assignments/:id/activity` | member | Audit feed: publishes, regrades, releases, reviews |
 | `POST` | `/exec/smoke` | instructor | Compile & run C now (dev route, budget-guarded) |
 | `GET` | `/meta/toolchain` · `/meta/usage` | signed-in | Compiler fingerprint / provider calls used today |
 | `POST` | `/internal/drain` | `X-Cron-Secret` | Queue drain; **404** while `CRON_SECRET` is empty |
@@ -204,18 +218,25 @@ per-metric tones rather than one flat hue.
 ## Execution layer
 
 The API never compiles C itself — Vercel has no toolchain. `src/execution/provider.js` is the
-only seam:
+only seam, chosen by `EXECUTION_PROVIDER`:
 
-- **Judge0 CE** (`ce.judge0.com`, `language_id: 103`) is the default: real CPU/wall/memory/process
-  limits, `compiler_options` for `-Wall -Wextra -std=c11`, and a status taxonomy.
-- **Wandbox** is a keyless fallback behind `EXECUTION_PROVIDER=wandbox`. It has no resource limits
-  and no timing data, so its results are labelled differently.
-- A **budget guard** counts calls per UTC day in `provider_usage` and returns `429` before the
-  public sandbox is exhausted.
+- **onlinecompiler.io** (`api.onlinecompiler.io`, `gcc-15`) is the default. It needs an API key
+  and no credit card, and answers in one synchronous call with compile output, stdout, stderr
+  and an exit code. It has no per-request CPU/memory/process limits, so `resolveLimits` records
+  the limits as *requested but not enforced* and the report says so rather than implying an
+  isolation it did not get.
+- **Judge0 CE** (`ce.judge0.com`, `language_id: 103`) stays available and is the only provider
+  that enforces CPU/wall/memory/process limits. `JUDGE0_API_KEY` from an older `.env` is read as
+  the onlinecompiler key, so the swap needed no edit to an existing file.
+- **Wandbox** is a keyless last resort behind `EXECUTION_PROVIDER=wandbox`. It has no resource
+  limits and no timing data, so its results are labelled differently.
+- A **budget guard** counts calls per UTC day in `provider_usage` (`EXEC_DAILY_BUDGET`) and
+  returns `429` before the sandbox is exhausted. The counter is shared by all three providers.
 
-Measured on 30 Oct 2026 (Judge0 CE 1.14.0, GCC 14.1.0, 64-bit): ~1.8 s per call, TLE at 1 s CPU,
-crashes collapse to `NZEC` with the signal still visible in stderr, and AddressSanitizer
-**worked**. Details and the exact numbers are in [docs/execution-notes.md](docs/execution-notes.md).
+Measured on 31 Oct 2026 against onlinecompiler.io: a compile-and-run of the two-integer sum
+returns `ACCEPTED` with stdout `5\n` in about 2 s wall clock, and a compile error comes back as
+a `COMPILATION_ERROR` with the gcc diagnostics intact. Judge0 numbers from 30 Oct 2026 are kept
+in [docs/execution-notes.md](docs/execution-notes.md) for comparison.
 
 ---
 
@@ -223,20 +244,23 @@ crashes collapse to `NZEC` with the signal still visible in stderr, and AddressS
 
 ```bash
 cd backend
-npm test              # unit + integration (52 tests)
+npm test              # unit + integration (76 tests)
 npm run test:unit     # no database needed
 ```
 
 Integration tests need `TEST_DATABASE_URL` / `TEST_DIRECT_URL` because they **truncate every
 table** between tests — that is why `scripts/setup-test-db.js` exists (it creates a dedicated
-`nyaywala_test` database). Expected output: `# pass 52, # fail 0, # cancelled 0`.
+`nyaywala_test` database). Expected output: `# pass 76, # fail 0, # cancelled 0`.
 
 Coverage: auth happy paths, duplicate email, wrong password, expired access token, refresh
 rotation and replay rejection, logout, login rate limiting, RBAC (student cannot create a course,
-instructor cannot read another roster, outsiders get 404), join-code behaviour, origin check,
-health — plus Week 2 units: canonicalisation and key-order invariance, `rules_hash` /
-`testset_hash` / `evaluation_key`, weight validation, scoring and contribution rounding, the
-status map, source normalisation/hashing and the rate limiter.
+instructor cannot read another roster, outsiders get 404), join-code behaviour, origin check
+(including a deployed host and a foreign origin), health — plus the units: canonicalisation and
+key-order invariance, `rules_hash` / `testset_hash` / `evaluation_key`, weight validation,
+scoring and contribution rounding, the status map, source normalisation/hashing, the rate
+limiter, the request-shape guard and binary detection, provider capability clamping, the
+onlinecompiler exit-code mapping, the rules-editor helpers (weight totals, publish diff, bulk
+paste) and the golden text report — replayed byte-for-byte from a fixture.
 
 ---
 
@@ -249,7 +273,10 @@ the frontend. Before the first deployment:
 2. Set `APP_ORIGIN` to the deployed origin and `EXEC_SMOKE_ENABLED=false`.
 3. Run `npx prisma migrate deploy` against the production direct URL.
 
-Section 8 of [CREDENTIALS-NEEDED.md](CREDENTIALS-NEEDED.md) has the table.
+Section 8 of [CREDENTIALS-NEEDED.md](CREDENTIALS-NEEDED.md) has the variable table, and
+[docs/vercel.md](docs/vercel.md) covers the deployment itself — including the
+**"Requests from https://… are not allowed"** failure on registration, which is a same-origin
+check rather than a broken account form.
 
 ---
 
@@ -259,7 +286,11 @@ Section 8 of [CREDENTIALS-NEEDED.md](CREDENTIALS-NEEDED.md) has the table.
 - [docs/decisions.md](docs/decisions.md) — six ADRs, the RBAC matrix, branch rules
 - [docs/execution-notes.md](docs/execution-notes.md) — measured latency, status map, sanitizer finding
 - [docs/demo-1.md](docs/demo-1.md) — the Day 7 demo script and what to test
-- [docs/task-board.md](docs/task-board.md) — Day 1–7 cards with acceptance criteria
+- [docs/task-board.md](docs/task-board.md) — Day 1–21 cards with acceptance criteria
+- [docs/security.md](docs/security.md) — Day 21 checklist, each row with the command that proves it
+- [docs/linux-wsl.md](docs/linux-wsl.md) — running on Windows, WSL and Linux
+- [docs/vercel.md](docs/vercel.md) — deploy steps and the failures that actually happen
+- [docs/rule-sets/](docs/rule-sets/) — the default rule set and the LLM-weighted example
 
 ---
 
@@ -269,10 +300,18 @@ Section 8 of [CREDENTIALS-NEEDED.md](CREDENTIALS-NEEDED.md) has the table.
   a distributed counter. Documented in ADR-004.
 - `POST /exec/smoke` runs arbitrary C for instructors. It is disabled in production unless
   explicitly enabled, and the budget guard caps the damage, but it is a development tool.
+- onlinecompiler.io enforces neither CPU nor memory limits; it is a synchronous call with a
+  30 s ceiling we abort before. Limits are recorded as *requested, not enforced*, and any metric
+  that depends on resource behaviour says so instead of pretending. Judge0 is the provider that
+  can enforce them.
 - Wandbox cannot enforce CPU or memory limits, so it must not be used for marks that depend on
   resource behaviour.
 - `POST /api/internal/drain` stays 404 until you set `CRON_SECRET`; no cron entry exists yet —
   the batch queue is Week 4.
 - The `llm_review` metric needs a `GROQ_API_KEY`; without one it reports `unavailable`. The
   default rule set weights it `0.00`, so the grade does not depend on it.
-- Similarity (originality) stores matches but the review-and-acknowledge UI is a Week 3 card.
+- Similarity is a best-effort originality signal (token shingles + structural features), not
+  proof of plagiarism. A flagged pair is a reason to look, and the review note is what a human
+  decided.
+- Rate limiting is still per warm instance: on Vercel each instance counts separately, so the
+  effective limit is `max × instances`. A Postgres counter is the Week 4 replacement.

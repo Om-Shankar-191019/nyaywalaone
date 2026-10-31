@@ -40,6 +40,34 @@ exists behind `EXECUTION_PROVIDER` so the choice is an environment variable, not
 guard (`provider_usage` + `429`), polling instead of trusting `wait=true`, and a fallback
 provider. Latency is ~1.8 s per call, measured.
 
+### Amendment (Week 3) — the default provider is onlinecompiler.io
+
+**Trigger.** Judge0's keyed plans (both RapidAPI and the hosted CE) require a credit card, which
+the team cannot provide. The public `ce.judge0.com` instance works but has no SLA and one shared
+quota — not something a marked submission should depend on.
+
+**Decision.** `EXECUTION_PROVIDER=onlinecompiler` by default, backed by
+`https://api.onlinecompiler.io` with `gcc-15` and a free API key. Judge0 and Wandbox stay
+implemented behind the same seam; `JUDGE0_API_KEY` is still read as the fallback name for the
+new key so an existing `.env` needed no edit.
+
+**What changed honestly.** This provider takes no compiler flags and enforces no CPU, memory or
+process limits. Rather than pretend otherwise:
+
+- each provider now declares `capabilities`, and `clampLimitsFor()` records per-limit
+  `*_limit_enforced` flags on every run;
+- the report's *Limitations* block is generated from that record (and a versioned
+  `grading/limitations.json`), so a report produced without enforced limits says so;
+- `ONLINECOMPILER_TIMEOUT_SECONDS` aborts before the provider's 30 s ceiling, so a wedged run is
+  a timeout we own;
+- the compile-error path is decided from the compiler's own exit code and diagnostics, not from
+  scraping stdout (a program that prints `error:` is still `ACCEPTED` — unit-tested).
+
+**Consequence for marks.** Any metric that depends on resource behaviour (`memory_audit`
+findings that need a real MLE, TLE-driven signals) is weaker on this provider. The rule sets in
+`docs/rule-sets/` do not weight those, and the report states the limitation. Judge0 remains the
+provider to switch to if CPU/memory enforcement is needed for a live marking run.
+
 ---
 
 ## ADR-002 — tree-sitter compiled to WASM for static analysis

@@ -1,11 +1,12 @@
 # What I need from you (and exactly where it goes)
 
-Weeks 1 and 2 are built and tested: accounts, courses, the execution sandbox, and the whole
+Weeks 1, 2 and 3 are built and tested: accounts, courses, the execution sandbox, the whole
 grading engine (submissions, versioned rule sets, the coordinator, every analyzer, the hashed
-evaluation key). Some of it cannot be created from inside this project because it belongs to
-your accounts: the Postgres database, a signing secret, an optional LLM key, and optionally a
-keyed sandbox plan. This file lists each one, where to get it, and the exact line to paste it
-into.
+evaluation key), and the Week 3 product surfaces (report page, rules editor, cohort filters and
+exports, similarity review, hardening). Some of it cannot be created from inside this project
+because it belongs to your accounts: the Postgres database, a signing secret, the sandbox API
+key, and an optional LLM key. This file lists each one, where to get it, and the exact line to
+paste it into.
 
 **Nothing in this repo contains a real secret.** `backend/.env` is gitignored; only
 `backend/.env.example` is committed.
@@ -18,7 +19,7 @@ into.
 |---|---|---|---|---|
 | 1 | `DATABASE_URL` (pooled) + `DIRECT_URL` (direct) | **Yes** — the app will not boot without them | [Neon](https://console.neon.tech) → your project → **Connect** → *Connection string* (choose "Pooled" then "Direct") | `backend/.env` lines 7–8, and Vercel env vars |
 | 2 | `ACCESS_TOKEN_SECRET` | **Yes** — 32+ random characters | You generate it with the command below; no signup | `backend/.env`: `ACCESS_TOKEN_SECRET=""` |
-| 3 | `JUDGE0_API_KEY` + `JUDGE0_API_HOST` | No — only if the free public sandbox rate-limits you | [RapidAPI Judge0 CE](https://rapidapi.com/judge0-official/api/judge0-ce) | `backend/.env`: `JUDGE0_API_KEY=`, `JUDGE0_API_HOST=` |
+| 3 | `ONLINECOMPILER_API_KEY` | **Yes** — the default execution provider is keyed | [onlinecompiler.io](https://www.onlinecompiler.io/) → account → API key | `backend/.env`: `ONLINECOMPILER_API_KEY=` |
 | 4 | `GROQ_API_KEY` | No — only for the optional `llm_review` metric | [Groq](https://console.groq.com/keys) | `backend/.env`: `GROQ_API_KEY=` |
 | 5 | `CRON_SECRET` | No — only for the queue drain endpoint | You generate it (any random string) | `backend/.env`: `CRON_SECRET=` |
 
@@ -100,15 +101,43 @@ The seeded instructor account ignores this code — it already exists.
 
 ---
 
-## 5. Judge0 — nothing needed for the demo, a key only if you get throttled
+## 5. The execution provider — onlinecompiler.io by default
 
-`EXECUTION_PROVIDER=judge0` with `JUDGE0_BASE_URL=https://ce.judge0.com` needs **no
-credentials**. It was verified from this machine on 30 Oct 2026: Judge0 CE 1.14.0, GCC 14.1.0,
-~1.8 s per call.
+Judge0's keyed plan wanted a credit card, so the default provider is **onlinecompiler.io**:
+one synchronous call, gcc 15 behind it, and a free API key.
 
-If the public host starts returning `429` or times out (it has no SLA), you have two options:
+```dotenv
+EXECUTION_PROVIDER=onlinecompiler
+ONLINECOMPILER_BASE_URL=https://api.onlinecompiler.io
+ONLINECOMPILER_API_KEY="your-key"
+ONLINECOMPILER_COMPILER=gcc-15          # a compiler id, not a language name
+ONLINECOMPILER_TIMEOUT_SECONDS=25       # we abort before the provider's 30 s ceiling
+EXEC_DAILY_BUDGET=200                   # calls per UTC day, shared by all providers
+```
 
-**Option A — keyed Judge0 on RapidAPI (keeps the same code path)**
+Where to get the key: sign in at <https://www.onlinecompiler.io/>, open the API section of your
+account and copy the key. It is a single string — there is no separate host.
+
+**If your `.env` already has the key in `JUDGE0_API_KEY`**, leave it there. `src/config.js` reads
+`JUDGE0_API_KEY` as the fallback for `ONLINECOMPILER_API_KEY`, so nothing breaks; renaming it is
+tidier but optional.
+
+**What this provider cannot do.** It enforces no CPU, memory or process limits, and it takes no
+compiler flags (the source is built with `gcc -O2 … -lm`). Both facts are recorded in the
+report (`limits_enforced`, `compiler_flags: false`) instead of being silently assumed, and
+`resolveLimits` caps the wall clock at the provider's ceiling.
+
+Verified on 31 Oct 2026: a compile-and-run of the two-integer sum returns `ACCEPTED` with
+stdout `5\n`, and a broken program returns `COMPILATION_ERROR` with the gcc diagnostics intact.
+
+### Alternatives, if you ever need them
+
+**Judge0** — the only provider here that enforces CPU, memory and process limits. The public
+host `https://ce.judge0.com` needs **no credentials** (verified 30 Oct 2026: Judge0 CE 1.14.0,
+GCC 14.1.0, ~1.8 s per call). Set `EXECUTION_PROVIDER=judge0` to use it.
+
+If the public host starts returning `429` or times out, a keyed RapidAPI plan keeps the same
+code path:
 
 1. Subscribe at <https://rapidapi.com/judge0-official/api/judge0-ce> (free tier available).
 2. Copy the two values RapidAPI shows in its code snippet into `backend/.env`:
@@ -120,8 +149,9 @@ If the public host starts returning `429` or times out (it has no SLA), you have
    ```
 
    The adapter sends them as `X-RapidAPI-Key` / `X-RapidAPI-Host` automatically.
+   Keep `EXECUTION_PROVIDER=judge0` set when you do this.
 
-**Option B — switch to the Wandbox fallback (no account)**
+**Wandbox** — keyless last resort, no account:
 
 ```dotenv
 EXECUTION_PROVIDER=wandbox
@@ -141,8 +171,11 @@ APP_ORIGIN=http://localhost:5173
 ```
 
 After you deploy, set it to the deployed frontend origin and make sure the backend sees the
-same value in Vercel (see section 8). This drives the cookie scope, the CORS allow-list and the
-CSRF origin check — three things that break quietly if it is wrong.
+same value in Vercel (see section 8). This drives the CORS allow-list and the CSRF origin check.
+
+**Same-origin is always accepted**, so a Vercel deployment keeps working even if this value is
+stale — that is the fix for `Requests from https://… are not allowed` when registering.
+See [docs/vercel.md](docs/vercel.md) section 2.
 
 ---
 
@@ -187,8 +220,9 @@ Vercel does not read `backend/.env`. Add the same variables in
 | `ACCESS_TOKEN_SECRET` | a **fresh** secret, different from local |
 | `APP_ORIGIN` | `https://<your-project>.vercel.app` (or your domain) |
 | `INSTRUCTOR_SIGNUP_CODE` | your chosen phrase |
-| `EXECUTION_PROVIDER` | `judge0` |
-| `JUDGE0_DAILY_BUDGET` | `200` (or lower for a demo) |
+| `EXECUTION_PROVIDER` | `onlinecompiler` |
+| `ONLINECOMPILER_API_KEY` | your onlinecompiler.io key |
+| `EXEC_DAILY_BUDGET` | `200` (or lower for a demo) |
 | `EXEC_SMOKE_ENABLED` | `false` — the smoke route should not be public in production |
 
 Notes that matter:
@@ -200,6 +234,8 @@ Notes that matter:
   request. There is no migration step in the build.
 - `backend/vercel.json` sets `maxDuration: 60` for the function. Grading calls can take a few
   seconds; the default 10 s is the usual cause of "randomly failing" runs on Hobby.
+- Full deployment walkthrough, including the origin (`CSRF_ORIGIN`) failure on registration and
+the one-command way to prove it: [docs/vercel.md](docs/vercel.md).
 
 ---
 
@@ -208,7 +244,8 @@ Notes that matter:
 - **No Docker.** Nothing in this project uses a container.
 - **No local C compiler.** Compilation happens at the provider; your machine and Vercel never
   run `gcc`.
-- **No SMTP, OAuth provider, S3 bucket or payment account.** Weeks 1–2 need none of them.
+- **No SMTP, OAuth provider, S3 bucket, payment account or credit card.** Weeks 1–3 need none
+  of them; the sandbox key is free and the LLM key is optional.
 - **No `.env` in git.** It is ignored, and only the example file is tracked.
 
 ---
@@ -233,9 +270,9 @@ Use Neon for the deployed version either way — Vercel cannot reach your laptop
 From `backend/`, after section 2 and 3:
 
 ```bash
-npm run db:deploy                 # 1. schema exists (2 Week 2 migrations)
+npm run db:deploy                 # 1. schema exists (3 migrations: init, week2, week3)
 npm run db:seed                   # 2. prints demo accounts + join code
-npm test                          # 3. expect: # pass 52, # fail 0, # cancelled 0
+npm test                          # 3. expect: # pass 76, # fail 0, # cancelled 0
 npm start                         # 4. then, in another terminal:
                                   #    curl -s localhost:3001/api/health
                                   #    -> {"data":{"status":"ok","db":"ok",...}}

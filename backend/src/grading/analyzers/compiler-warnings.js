@@ -13,11 +13,18 @@ export const paramsSchema = z
   .strict();
 
 /**
- * Syntax health: compile-only with the instructor's flags.
+ * Syntax health: compile the file and count what the compiler said.
  *
  * The flags are part of the rules file, and the compiler is pinned by the
  * toolchain fingerprint, so "0 warnings" means something specific rather than
  * "whatever compiler happened to be installed".
+ *
+ * Some sandboxes cannot be told which flags to use - onlinecompiler.io compiles
+ * with a fixed `gcc -O2` and has no options field. In that case the metric still
+ * runs (a compile failure is a compile failure whatever the flags), but it is
+ * reported as `partial` and the feedback says exactly which diagnostics were
+ * unavailable. Silently claiming a clean `-Wall` compile would be a lie of
+ * omission, and it would change the grade without changing the code.
  */
 export const compilerWarningsAnalyzer = {
   name: 'compiler_warnings',
@@ -25,17 +32,21 @@ export const compilerWarningsAnalyzer = {
   paramsSchema,
 
   async run(ctx, params) {
+    const supportsFlags = ctx.capabilities?.compilerFlags ?? true;
+    const flags = supportsFlags ? params.flags : null;
+
     const run = await runCached({
       kind: 'compile',
       source: ctx.source,
       sourceHash: ctx.sourceHash,
       stdin: '',
-      compilerOptions: params.flags,
+      compilerOptions: flags,
       limits: ctx.limits,
     });
 
     const parsed = parseGccOutput(run.compileOutput);
-    const failedCompile = run.status.code === STATUS.COMPILATION_ERROR;
+    const failedCompile =
+      run.status.code === STATUS.COMPILATION_ERROR || /(^|\n)[^\n]*\berror:/.test(String(run.compileOutput ?? ''));
 
     // A compiler that rejects the source has more than a warning problem.
     if (failedCompile) {
@@ -43,11 +54,12 @@ export const compilerWarningsAnalyzer = {
         score: 0,
         status: 'ok',
         evidence: {
-          errors: parsed.errors.length,
+          errors: Math.max(1, parsed.errors.length),
           warnings: parsed.warnings.length,
           diagnostics: parsed.errors.slice(0, 5),
           by_code: parsed.byCode,
-          flags: params.flags,
+          flags_requested: params.flags,
+          flags_applied: flags,
         },
         feedback: parsed.errors[0]
           ? `The compiler rejected the file: ${firstDiagnosticSummary(parsed)}`
@@ -58,6 +70,27 @@ export const compilerWarningsAnalyzer = {
     const warnings = parsed.warnings.length;
     const score = params.warnings_as_errors && warnings > 0 ? 0 : clamp01(1 - warnings * params.penalty_per_warning);
 
+    if (!supportsFlags) {
+      return {
+        score: round3(score),
+        status: 'partial',
+        evidence: {
+          errors: 0,
+          warnings,
+          diagnostics: parsed.warnings.slice(0, 5),
+          by_code: parsed.byCode,
+          flags_requested: params.flags,
+          flags_applied: null,
+          warnings_as_errors: params.warnings_as_errors,
+          reason: 'provider_has_no_compiler_flags',
+        },
+        feedback:
+          warnings === 0
+            ? `Compiled without errors. The sandbox uses a fixed compile line, so the ${params.flags} diagnostics requested by this rule set were not available.`
+            : `Compiled with ${warnings} warning${warnings === 1 ? '' : 's'} from the compiler's default set; ${params.flags} could not be applied on this sandbox.`,
+      };
+    }
+
     return {
       score: round3(score),
       status: 'ok',
@@ -66,7 +99,8 @@ export const compilerWarningsAnalyzer = {
         warnings,
         diagnostics: parsed.warnings.slice(0, 5),
         by_code: parsed.byCode,
-        flags: params.flags,
+        flags_requested: params.flags,
+        flags_applied: flags,
         warnings_as_errors: params.warnings_as_errors,
       },
       feedback:

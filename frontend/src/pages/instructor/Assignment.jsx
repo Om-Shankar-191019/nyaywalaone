@@ -5,6 +5,8 @@ import { useParams } from 'react-router';
 import { api } from '../../api/client.js';
 import { ErrorState } from '../../components/states.jsx';
 import { Alert, Badge, Button, Card, CardHeader, Field, Input, LinkButton, PageHeader } from '../../components/ui.jsx';
+import { parseBulkTests } from '../../lib/rules.js';
+import { RulesPanel } from './RulesPanel.jsx';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
@@ -96,7 +98,12 @@ export function InstructorAssignment() {
 
       {tab === 'tests' ? <TestsPanel assignmentId={assignmentId} assignment={assignment} onChanged={invalidateAll} /> : null}
       {tab === 'rules' ? <RulesPanel assignmentId={assignmentId} assignment={assignment} onChanged={invalidateAll} /> : null}
-      {tab === 'cohort' ? <CohortPanel assignmentId={assignmentId} onChanged={invalidateAll} /> : null}
+      {tab === 'cohort' ? (
+        <div className="space-y-5">
+          <CohortPanel assignmentId={assignmentId} onChanged={invalidateAll} />
+          <ActivityPanel assignmentId={assignmentId} />
+        </div>
+      ) : null}
       {tab === 'similarity' ? <SimilarityPanel assignmentId={assignmentId} /> : null}
     </>
   );
@@ -104,6 +111,9 @@ export function InstructorAssignment() {
 
 function TestsPanel({ assignmentId, assignment, onChanged }) {
   const [form, setForm] = useState({ name: '', stdin: '', expectedStdout: '', isHidden: false });
+  const [bulk, setBulk] = useState('');
+  const [bulkProblems, setBulkProblems] = useState([]);
+  const [bulkNotice, setBulkNotice] = useState(null);
 
   const testsQuery = useQuery({ queryKey: ['tests', assignmentId], queryFn: () => api.get(`/assignments/${assignmentId}/tests`) });
 
@@ -123,6 +133,26 @@ function TestsPanel({ assignmentId, assignment, onChanged }) {
   const toggleHidden = useMutation({
     mutationFn: (test) => api.patch(`/assignments/${assignmentId}/tests/${test.id}`, { isHidden: !test.isHidden }),
     onSuccess: onChanged,
+  });
+
+  const bulkCreate = useMutation({
+    mutationFn: async (rows) => {
+      let added = 0;
+      for (const row of rows) {
+        try {
+          await api.post(`/assignments/${assignmentId}/tests`, row);
+          added += 1;
+        } catch (error) {
+          setBulkProblems((current) => [...current, `${row.name}: ${error.message}`]);
+        }
+      }
+      return added;
+    },
+    onSuccess: async (added) => {
+      setBulk('');
+      setBulkNotice({ tone: 'success', text: `${added} test case${added === 1 ? '' : 's'} added as hidden.` });
+      await onChanged();
+    },
   });
 
   const tests = testsQuery.data?.tests ?? [];
@@ -234,151 +264,79 @@ function TestsPanel({ assignmentId, assignment, onChanged }) {
           </Button>
         </form>
       </Card>
-    </div>
-  );
-}
 
-function RulesPanel({ assignmentId, assignment, onChanged }) {
-  const queryClient = useQueryClient();
-  const rulesQuery = useQuery({ queryKey: ['rules', assignmentId], queryFn: () => api.get(`/assignments/${assignmentId}/rules`) });
-
-  const loaded = rulesQuery.data?.draft?.rules ?? rulesQuery.data?.defaults;
-  const [draft, setDraft] = useState(null);
-  const text = useMemo(() => JSON.stringify(draft ?? loaded ?? {}, null, 2), [draft, loaded]);
-  const [errors, setErrors] = useState([]);
-  const [notice, setNotice] = useState(null);
-
-  const save = useMutation({
-    mutationFn: (rules) => api.put(`/assignments/${assignmentId}/rules`, { rules }),
-    onSuccess: async (data) => {
-      setErrors(data.errors ?? []);
-      setNotice({ tone: 'success', text: `Saved version ${data.version} as a draft.` });
-      setDraft(null);
-      await onChanged();
-    },
-    onError: (error) => {
-      setErrors(Array.isArray(error.details) ? error.details : []);
-      setNotice({ tone: 'danger', text: error.message });
-    },
-  });
-
-  const publishRules = useMutation({
-    mutationFn: () => api.post(`/assignments/${assignmentId}/rules/publish`),
-    onSuccess: async () => {
-      setNotice({ tone: 'success', text: 'Rule set published and activated. Later saves create a new version.' });
-      await onChanged();
-    },
-    onError: (error) => {
-      setErrors(Array.isArray(error.details) ? error.details : []);
-      setNotice({ tone: 'danger', text: error.message });
-    },
-  });
-
-  const referenceMutation = useMutation({
-    mutationFn: (referenceSolution) => api.patch(`/assignments/${assignmentId}`, { referenceSolution }),
-    onSuccess: async () => {
-      setNotice({ tone: 'success', text: 'Reference solution saved; edge cases will be judged against it.' });
-      await queryClient.invalidateQueries({ queryKey: ['assignment', assignmentId] });
-    },
-  });
-
-  const [reference, setReference] = useState(assignment?.referenceSolution ?? '');
-
-  const onSave = () => {
-    try {
-      save.mutate(JSON.parse(text));
-    } catch (error) {
-      setNotice({ tone: 'danger', text: `That is not valid JSON: ${error.message}` });
-    }
-  };
-
-  const active = rulesQuery.data?.active;
-  const versions = rulesQuery.data?.versions ?? [];
-
-  return (
-    <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr] lg:items-start">
-      <Card>
+      <Card className="lg:col-span-2">
         <CardHeader
-          title="Rule set JSON"
-          description="Weights must sum to 1.00. Saving a published version creates the next version."
-          action={active ? <Badge tone="brand">active v{active.version}</Badge> : <Badge tone="warning">none active</Badge>}
+          title="Bulk paste"
+          description="One case per line: input|||expected. Use \\n for a newline; lines starting with # are ignored."
         />
-        <div className="space-y-3 p-4">
+        <div className="space-y-3 p-5">
           <textarea
-            value={text}
-            onChange={(event) => setDraft(event.target.value)}
-            rows={24}
+            rows={6}
+            value={bulk}
+            onChange={(event) => setBulk(event.target.value)}
             spellCheck={false}
-            className="w-full rounded-lg border border-line bg-surface p-3 font-mono text-[0.6875rem] leading-relaxed text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label="Bulk test cases"
+            placeholder={'# two integers, one per line\n40 2|||42\\n\n# negatives\n-7 4|||-3\\n'}
+            className="w-full rounded-lg border border-line bg-surface p-3 font-mono text-xs text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           />
-          {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}
-          {errors.length ? (
-            <Alert tone="danger" title="Validation errors">
+          {bulkProblems.length ? (
+            <Alert tone="warning" title="Some lines were skipped">
               <ul className="list-disc space-y-1 pl-4">
-                {errors.map((error) => (
-                  <li key={`${error.path}-${error.message}`}>
-                    <span className="font-mono">{error.path}</span>: {error.message}
-                  </li>
+                {bulkProblems.map((problem) => (
+                  <li key={problem}>{problem}</li>
                 ))}
               </ul>
             </Alert>
           ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={onSave} loading={save.isPending}>
-              <Scale aria-hidden="true" size={15} />
-              Save draft
-            </Button>
-            <Button variant="secondary" onClick={() => publishRules.mutate()} loading={publishRules.isPending}>
-              Publish rule set
-            </Button>
-          </div>
+          {bulkNotice ? <Alert tone={bulkNotice.tone}>{bulkNotice.text}</Alert> : null}
+          <Button
+            variant="secondary"
+            loading={bulkCreate.isPending}
+            disabled={!bulk.trim()}
+            onClick={() => {
+              const { rows, problems } = parseBulkTests(bulk);
+              setBulkProblems(problems);
+              if (!rows.length) {
+                setBulkNotice({ tone: 'warning', text: 'Nothing to add: no line had an input|||expected pair.' });
+                return;
+              }
+              // Duplicate names are the server's 409; a suffix keeps a second
+              // paste of the same block from failing halfway through.
+              const taken = new Set(tests.map((test) => test.name));
+              const prepared = rows.map((row, index) => {
+                let name = row.name;
+                let suffix = index + 1;
+                while (taken.has(name)) {
+                  suffix += 1;
+                  name = `${row.name} (${suffix})`;
+                }
+                taken.add(name);
+                return { ...row, name, ordinal: tests.length + index };
+              });
+              bulkCreate.mutate(prepared);
+            }}
+          >
+            Add {parseBulkTests(bulk).rows.length || ''} case{parseBulkTests(bulk).rows.length === 1 ? '' : 's'}
+          </Button>
         </div>
       </Card>
-
-      <div className="space-y-5">
-        <Card>
-          <CardHeader title="Versions" description="Older versions stay readable to old reports." />
-          <ul className="divide-y divide-line">
-            {versions.map((version) => (
-              <li key={version.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-xs">
-                <span className="font-mono text-fg">v{version.version}</span>
-                <span className="text-muted">{version.isPublished ? 'published' : 'draft'}</span>
-                <span className="font-mono text-[0.625rem] text-muted">{version.rulesHash.slice(0, 10)}</span>
-              </li>
-            ))}
-            {versions.length === 0 ? <li className="px-5 py-4 text-sm text-muted">No versions saved yet.</li> : null}
-          </ul>
-        </Card>
-
-        <Card>
-          <CardHeader title="Reference solution" description="Used by the oracle for edge cases. Never shown to students." />
-          <div className="space-y-3 p-4">
-            <textarea
-              value={reference}
-              onChange={(event) => setReference(event.target.value)}
-              rows={12}
-              spellCheck={false}
-              className="w-full rounded-lg border border-line bg-surface p-3 font-mono text-[0.6875rem] leading-relaxed text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              placeholder="#include <stdio.h> ..."
-            />
-            {referenceMutation.error ? <Alert tone="danger">{referenceMutation.error.message}</Alert> : null}
-            <Button
-              size="sm"
-              variant="secondary"
-              loading={referenceMutation.isPending}
-              onClick={() => referenceMutation.mutate(reference)}
-            >
-              Save reference
-            </Button>
-          </div>
-        </Card>
-      </div>
     </div>
   );
 }
 
 const cohortQueryKey = (assignmentId, filters) => ['cohort', assignmentId, filters];
-const emptyFilters = { q: '', status: 'ANY', sort: 'name', direction: 'asc', page: 1, pageSize: 25 };
+const emptyFilters = {
+  q: '',
+  status: 'ANY',
+  sort: 'name',
+  direction: 'asc',
+  page: 1,
+  pageSize: 25,
+  minGrade: '',
+  maxGrade: '',
+  flaggedOnly: 'false',
+};
 
 function CohortPanel({ assignmentId, onChanged }) {
   const queryClient = useQueryClient();
@@ -453,6 +411,37 @@ function CohortPanel({ assignmentId, onChanged }) {
             ))}
           </select>
         </Field>
+        <Field label="Min %" htmlFor="cohort-min">
+          <Input
+            id="cohort-min"
+            type="number"
+            min="0"
+            max="100"
+            value={filters.minGrade}
+            onChange={(event) => setFilters({ ...filters, minGrade: event.target.value, page: 1 })}
+            className="h-8 w-20 text-xs"
+          />
+        </Field>
+        <Field label="Max %" htmlFor="cohort-max">
+          <Input
+            id="cohort-max"
+            type="number"
+            min="0"
+            max="100"
+            value={filters.maxGrade}
+            onChange={(event) => setFilters({ ...filters, maxGrade: event.target.value, page: 1 })}
+            className="h-8 w-20 text-xs"
+          />
+        </Field>
+        <label className="flex h-8 items-center gap-2 text-xs text-fg">
+          <input
+            type="checkbox"
+            checked={filters.flaggedOnly === 'true'}
+            onChange={(event) => setFilters({ ...filters, flaggedOnly: event.target.checked ? 'true' : 'false', page: 1 })}
+            className="size-3.5 rounded border-line text-brand focus-visible:ring-2 focus-visible:ring-brand"
+          />
+          Flagged only
+        </label>
         <Field label="Sort" htmlFor="cohort-sort">
           <select
             id="cohort-sort"
@@ -575,7 +564,34 @@ function CohortPanel({ assignmentId, onChanged }) {
 }
 
 function SimilarityPanel({ assignmentId }) {
-  const query = useQuery({ queryKey: ['similarity', assignmentId], queryFn: () => api.get(`/assignments/${assignmentId}/similarity`) });
+  const queryClient = useQueryClient();
+  const [threshold, setThreshold] = useState(0.6);
+  const [summary, setSummary] = useState(null);
+  const [reviewing, setReviewing] = useState(null);
+  const [note, setNote] = useState('');
+
+  const query = useQuery({
+    queryKey: ['similarity', assignmentId, threshold],
+    queryFn: () => api.get(`/assignments/${assignmentId}/similarity?threshold=${threshold}`),
+  });
+
+  const scan = useMutation({
+    mutationFn: () => api.post(`/assignments/${assignmentId}/similarity/scan`, {}),
+    onSuccess: async (data) => {
+      setSummary(data);
+      await queryClient.invalidateQueries({ queryKey: ['similarity', assignmentId] });
+    },
+  });
+
+  const review = useMutation({
+    mutationFn: ({ matchId, reviewed, note: text }) => api.patch(`/similarity/${matchId}/review`, { reviewed, note: text }),
+    onSuccess: async () => {
+      setReviewing(null);
+      setNote('');
+      await queryClient.invalidateQueries({ queryKey: ['similarity', assignmentId] });
+    },
+  });
+
   const matches = query.data?.matches ?? [];
 
   return (
@@ -583,27 +599,181 @@ function SimilarityPanel({ assignmentId }) {
       <CardHeader
         title="Similarity"
         description="Identical canonical solutions and high shingle overlap. A flag is a reason to look, not a finding of misconduct."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="sim-threshold" className="text-xs text-muted">
+              Threshold
+            </label>
+            <select
+              id="sim-threshold"
+              value={threshold}
+              onChange={(event) => setThreshold(Number(event.target.value))}
+              className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-fg"
+            >
+              {[0.5, 0.6, 0.75, 0.85, 0.95].map((value) => (
+                <option key={value} value={value}>
+                  {(value * 100).toFixed(0)}%
+                </option>
+              ))}
+            </select>
+            <Button size="sm" variant="secondary" loading={scan.isPending} onClick={() => scan.mutate()}>
+              Scan cohort
+            </Button>
+          </div>
+        }
       />
+
+      {summary ? (
+        <div className="px-5 pt-4">
+          <Alert tone="info">
+            Compared {summary.compared} pair{summary.compared === 1 ? '' : 's'} across {summary.submissions} submission
+            {summary.submissions === 1 ? '' : 's'}: {summary.pairs} above 50%, {summary.flagged} at or above the{' '}
+            {(summary.params.flag_threshold * 100).toFixed(0)}% review threshold.
+          </Alert>
+        </div>
+      ) : null}
+
+      {scan.error ? (
+        <div className="px-5 pt-4">
+          <Alert tone="danger">{scan.error.message}</Alert>
+        </div>
+      ) : null}
+
       {query.isError ? (
         <div className="p-5">
           <ErrorState error={query.error} onRetry={query.refetch} />
         </div>
       ) : matches.length === 0 ? (
-        <p className="px-5 py-8 text-sm text-muted">No flagged pairs at this threshold. Pairs appear once two students submit overlapping solutions.</p>
+        <p className="px-5 py-8 text-sm text-muted">
+          No pairs at this threshold. Run a scan, or lower the threshold - two independent solutions to a small problem can share
+          a lot of structure.
+        </p>
       ) : (
         <ul className="divide-y divide-line">
           {matches.map((match) => (
-            <li key={match.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-              <div className="text-sm text-fg">
-                <p>
-                  {match.a?.student?.fullName ?? 'unknown'} (attempt {match.a?.attempt ?? '—'}) ↔ {match.b?.student?.fullName ?? 'unknown'} (attempt{' '}
-                  {match.b?.attempt ?? '—'})
-                </p>
-                <p className="mt-0.5 text-xs text-muted">
-                  {match.method} · {formatDate(match.createdAt)}
-                </p>
+            <li key={match.id} className="space-y-2 px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-fg">
+                  <p>
+                    {match.a?.student?.fullName ?? 'unknown'} (attempt {match.a?.attempt ?? '—'}) ↔{' '}
+                    {match.b?.student?.fullName ?? 'unknown'} (attempt {match.b?.attempt ?? '—'})
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {match.method} · {formatDate(match.createdAt)}
+                    {match.matchedSpan?.identical ? ' · byte-identical' : ''}
+                    {match.reviewedAt ? ' \u00b7 reviewed' : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge tone={match.similarity >= 0.9 ? 'danger' : 'warning'}>{(match.similarity * 100).toFixed(1)}%</Badge>
+                  {match.reviewedAt ? (
+                    <Button size="sm" variant="ghost" onClick={() => review.mutate({ matchId: match.id, reviewed: false })}>
+                      Reopen
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => setReviewing(match.id)}>
+                      Mark reviewed
+                    </Button>
+                  )}
+                </div>
               </div>
-              <Badge tone={match.similarity >= 0.9 ? 'danger' : 'warning'}>{(match.similarity * 100).toFixed(1)}%</Badge>
+
+              {match.reviewNote ? <p className="text-xs text-muted">Note: {match.reviewNote}</p> : null}
+
+              {reviewing === match.id ? (
+                <div className="rounded-lg border border-line bg-surface-2 p-3">
+                  <label htmlFor={`note-${match.id}`} className="text-xs font-medium text-fg">
+                    What did you decide?
+                  </label>
+                  <textarea
+                    id={`note-${match.id}`}
+                    rows={2}
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Shared starter file; explained together in class."
+                    className="mt-1 w-full rounded-lg border border-line bg-surface p-2 text-xs text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <Button size="sm" loading={review.isPending} onClick={() => review.mutate({ matchId: match.id, reviewed: true, note })}>
+                      Save review
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setReviewing(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Day 18: who changed what.
+ *
+ * A release, a regrade and a rule-set publish all move a grade after the fact.
+ * Without a feed, "why is my mark different?" is answered from `psql`, which is
+ * not a product surface.
+ */
+function ActivityPanel({ assignmentId }) {
+  const activityQuery = useQuery({
+    queryKey: ['activity', assignmentId],
+    queryFn: () => api.get(`/assignments/${assignmentId}/activity?limit=15`),
+    refetchInterval: 30_000,
+  });
+
+  const entries = activityQuery.data?.entries ?? [];
+
+  const label = (entry) => {
+    switch (entry.action) {
+      case 'grade.release':
+        return 'released a grade';
+      case 'grade.unrelease':
+        return 'withdrew a release';
+      case 'evaluation.regrade':
+        return 're-graded a submission';
+      case 'ruleset.publish':
+        return `published rule set v${entry.metadata?.version ?? '?'}`;
+      case 'cohort.export':
+        return 'exported the cohort CSV';
+      case 'roster.remove':
+        return 'removed a student from the course';
+      default:
+        return entry.action;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader
+        title="Activity"
+        description="Releases, regrades and rule-set publishes on this assignment."
+        action={
+          <Button variant="ghost" size="sm" onClick={() => activityQuery.refetch()} loading={activityQuery.isFetching}>
+            Refresh
+          </Button>
+        }
+      />
+      {activityQuery.isError ? (
+        <div className="p-5">
+          <ErrorState error={activityQuery.error} onRetry={activityQuery.refetch} />
+        </div>
+      ) : entries.length === 0 ? (
+        <p className="px-5 py-6 text-sm text-muted">Nothing recorded yet.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {entries.map((entry) => (
+            <li key={entry.id} className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-2.5 text-xs">
+              <span className="text-fg">
+                <span className="font-medium">{entry.actor?.fullName ?? 'System'}</span> {label(entry)}
+                {entry.metadata?.reason ? <span className="text-muted"> — {entry.metadata.reason}</span> : null}
+              </span>
+              <time className="text-muted" dateTime={entry.createdAt}>
+                {new Date(entry.createdAt).toLocaleString()}
+              </time>
             </li>
           ))}
         </ul>

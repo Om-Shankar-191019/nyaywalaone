@@ -168,12 +168,19 @@ model Submission {
   releasedAt   DateTime? @map("released_at") @db.Timestamptz(6)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  // Week 3, Day 19: the MinHash signature is computed once and reused by every
+  // later comparison. Storing it (with the parameters that produced it) turns an
+  // O(n^2) re-tokenise into an O(n^2) integer compare on a 12-submission cohort.
+  signature       Json?   @map("signature")
+  signatureParams Json?   @map("signature_params")
+
   assignment  Assignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   student     User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
   evaluations Evaluation[]
 
   @@unique([assignmentId, studentId, attempt])
   @@index([assignmentId, studentId])
+  @@index([assignmentId, createdAt(sort: Desc)])
   @@map("submissions")
 }
 
@@ -190,6 +197,9 @@ model Evaluation {
   graderVersion        String           @map("grader_version")
   failedReason         String?          @map("failed_reason")
   lineageOfId          String?          @map("lineage_of") @db.Uuid
+  // Day 15: a grade is not predictable, so the UI polls a named stage rather
+  // than a percentage. queued | compiling | testing | analyzing | done | failed
+  stage                String           @default("queued")
   startedAt            DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
   finishedAt           DateTime?        @map("finished_at") @db.Timestamptz(6)
 
@@ -242,6 +252,11 @@ model SimilarityMatch {
   similarity   Float
   method       String   @default("minhash-128")
   matchedSpan  Json?    @map("matched_span")
+  // Day 19: "review recommended" is a prompt for a human, so the outcome of
+  // that review is recorded next to the flag. Nothing is ever auto-penalised.
+  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  reviewedBy   String?   @map("reviewed_by") @db.Uuid
+  reviewNote   String?   @map("review_note")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)

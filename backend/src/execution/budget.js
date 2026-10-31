@@ -12,7 +12,7 @@ export function utcDay(date = new Date()) {
  * demo-day risk, so usage is counted per UTC day and a call over the limit is
  * refused with 429 before it is attempted.
  */
-export async function assertWithinBudget(provider, budget = config.JUDGE0_DAILY_BUDGET) {
+export async function assertWithinBudget(provider, budget = config.EXEC_DAILY_BUDGET) {
   if (budget <= 0) return { used: 0, budget: 0, unlimited: true };
 
   const row = await prisma.providerUsage.findUnique({
@@ -25,7 +25,7 @@ export async function assertWithinBudget(provider, budget = config.JUDGE0_DAILY_
     throw new AppError(
       429,
       'PROVIDER_BUDGET_EXCEEDED',
-      `Daily execution budget of ${budget} calls is spent. Grading resumes after 00:00 UTC, or raise JUDGE0_DAILY_BUDGET.`,
+      `Daily execution budget of ${budget} calls is spent. Grading resumes after 00:00 UTC, or raise EXEC_DAILY_BUDGET.`,
       { used, budget, provider },
     );
   }
@@ -47,5 +47,5 @@ export async function usageToday(provider) {
     where: { provider_day: { provider, day: utcDay() } },
     select: { calls: true },
   });
-  return { provider, day: utcDay().toISOString().slice(0, 10), calls: row?.calls ?? 0, budget: config.JUDGE0_DAILY_BUDGET };
+  return { provider, day: utcDay().toISOString().slice(0, 10), calls: row?.calls ?? 0, budget: config.EXEC_DAILY_BUDGET };
 }

@@ -137,3 +137,88 @@
     @apply rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[0.8125rem] text-fg;
   }
 }
+
+/**
+ * Print stylesheet for the evaluation report.
+ *
+ * A report is a document students keep and instructors attach to a viva, so it
+ * has to survive A4: no navigation, no buttons, no dark background burning a
+ * cartridge, and no clipped tables. Two pages is the target - the plan's exit
+ * criterion is that the report prints in two A4 pages without clipping.
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    /* Force the light palette: a printer cannot render rgb(10 10 10) usefully. */
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* Chrome: the app shell, not the report. */
+  nav,
+  aside,
+  header,
+  footer,
+  button,
+  [role='navigation'],
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Keep evidence readable and unbroken. */
+  pre,
+  table,
+  ol,
+  ul,
+  .card {
+    break-inside: avoid;
+  }
+
+  table {
+    width: 100% !important;
+    font-size: 9pt !important;
+  }
+
+  th,
+  td {
+    padding: 3pt 4pt !important;
+    border-color: #999 !important;
+    color: #111 !important;
+  }
+
+  a[href]::after {
+    /* The URL matters in a printed report; hashes in the text do not repeat. */
+    content: '';
+  }
+
+  details {
+    /* A collapsed section prints as an empty heading, so force it open. */
+    display: block !important;
+  }
+
+  details > summary {
+    list-style: none;
+  }
+
+  pre {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    background: #f5f5f5 !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .print-break {
+    break-before: page;
+  }
+}

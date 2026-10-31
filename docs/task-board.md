@@ -112,6 +112,130 @@ git tag v0.1.0-foundation
 
 ---
 
+# Week 3 task board
+
+Days 15-21. Same rule as Week 1: a card is done when the acceptance criterion was met on a
+real run, not when the code compiled.
+
+| Day | Card | Done when | Status |
+|---|---|---|---|
+| 15 | Submission flow | A student sees `queued → running → graded` without a refresh; a second click cannot create a second run | **Done** |
+| 16 | Report page | A graded submission renders every metric, the diff, and downloads; printing it yields one clean sheet | **Done** |
+| 17 | Rules editor | Weights that do not sum to 1.00 block publish; the diff names every change from the active version | **Done** |
+| 18 | Cohort and roster | Filter, paginate, export CSV; the roster counts each student's submissions in one query | **Done** |
+| 19 | Similarity | A batch scan stores pairs; reviewing one records who looked and when, and changes no grade | **Done** |
+| 20 | Style, LLM, limitations | A report states what the grader could *not* do, and the text report is byte-identical on replay | **Done** |
+| 21 | Hardening | Every row of `docs/security.md` was run, not asserted | **Done** |
+
+---
+
+## Day 15 — the submission flow
+
+- [x] `POST /assignments/:id/submissions` returns `202` with an evaluation id; the page polls
+      `GET /submissions/:id` with backoff and stops on a terminal status.
+- [x] Submit is disabled while a run is in flight, so a double click cannot spend provider quota.
+- [x] Client-side validation mirrors the server: `.c` only, 64 KB, not empty, no NUL bytes.
+- [x] The chosen file is previewed (name, size, first lines) before it is sent.
+- [x] Server errors land in the form, with the field named, not in an alert.
+
+**Evidence:** submitting the two-integer sum from the browser reached `graded` without a reload;
+pasting binary content was refused before the request left the page.
+
+## Day 16 — the report a student actually reads
+
+- [x] Grade, per-metric contribution (integer hundredths), and the rule-set version that produced it.
+- [x] Source vs reference diff, side by side, scrollable, with the changed lines marked.
+- [x] `.txt` and `.json` download, print stylesheet that drops the chrome.
+- [x] `report_hash` shown and copyable — that is the reproducibility claim made checkable.
+- [x] Released/withheld state: a student sees the report only once the instructor releases it.
+- [x] Headings, table semantics, focus order and colour contrast checked by keyboard.
+
+**Evidence:** `tests/unit/report-text.test.js` replays a stored view through the text renderer and
+compares it to `tests/golden/report-text.txt` byte for byte (`UPDATE_GOLDEN=1 npm test` accepts an
+intentional change).
+
+## Day 17 — the rules editor
+
+- [x] Fields are generated from each analyzer's Zod schema, so the editor cannot drift from the engine.
+- [x] Live weight total with the sum in hundredths; publishing is blocked until it is exactly 1.00.
+- [x] Publish shows a diff against the active version (added, removed, reweighted) before it freezes.
+- [x] Bulk paste of test cases as `input|||expected`, with a per-line error for a bad row.
+- [x] Publishing bumps the version and stores `rules_hash`; old evaluations keep their version.
+
+**Evidence:** `tests/unit/week3.test.js` covers `zodToSchema`, weight validation and the diff;
+the second example rule set (`docs/rule-sets/llm-assisted.json`) gives `llm_review` weight 0.10.
+
+## Day 18 — cohort, roster, activity
+
+- [x] Cohort table: status filter, student search, sort by grade, pagination.
+- [x] `GET /assignments/:id/export.csv` streams the same rows the table shows.
+- [x] Roster includes per-student submission counts via one grouped query, not N+1.
+- [x] Activity feed records publish, regrade, release and review, so a changed mark has a cause.
+
+**Evidence:** `GET /courses/:id/roster` and `/assignments/:id/activity` return in one query each;
+CSV download opens in a spreadsheet with the same filters applied.
+
+## Day 19 — similarity review
+
+- [x] `POST /assignments/:id/similarity/scan` compares every pair once and stores new matches
+      with the method name (`minhash-128`) and the matched span.
+- [x] `PATCH /similarity/:matchId/review` records `reviewedAt`, `reviewedBy`, an optional note,
+      and writes an audit row — it can reopen a match too.
+- [x] Reviewing **never** changes a grade; a flag is a prompt for a human.
+- [x] Instructor UI lists pairs by similarity with both attempts and a review action.
+
+**Evidence:** scanning the seeded cohort created pairs; reviewing one wrote the audit row and
+left `grade_hundredths` untouched.
+
+## Day 20 — style, LLM, and the limitations file
+
+- [x] `style` analyzer: naming, magic numbers, function length, comment ratio — evidence, not marks.
+- [x] `llm_review` uses the Groq key when present and reports `unavailable` when not; the rule
+      set's `on_unavailable` policy decides the cost.
+- [x] Every limitation lives in one versioned `grading/limitations.json`, stamped into the report
+      as `limitations_version`.
+- [x] Text and JSON reports are rendered from one view object, so they cannot disagree.
+
+**Evidence:** the report on a provider that cannot enforce limits says so under *Limitations*;
+the golden snapshot test fails if that wording changes silently.
+
+## Day 21 — hardening
+
+- [x] `jsonShapeGuard`: depth ≤ 8, arrays ≤ 200, before any validator walks the body.
+- [x] Upload guard: NUL/control-character detection rejects binary dressed as `.c`.
+- [x] Rate limits: login/register 5/min per IP+email, submissions 10/hour per account;
+      `Retry-After` on refusal.
+- [x] Origin check accepts same-origin (deployed hosts) and refuses cross-site, including through
+      proxy headers — the fix for `Requests from … are not allowed` on Vercel.
+- [x] `docs/security.md`: every control with the command that proves it.
+
+**Evidence:** `npm test` → `# pass 76, # fail 0`; every row of `docs/security.md` was executed on
+31 Oct 2026.
+
+## Cross-cutting — Linux and WSL
+
+- [x] `.env` files are read through `sanitiseEnv()`, so a BOM or CRLF from a Windows editor no
+      longer produces `"https://x\r" is not a URL`.
+- [x] `.gitattributes` pins `*.sh`/`*.env` to LF, so a checkout on Windows does not break a script.
+- [x] Vite dev server binds explicitly and proxies `/api`, so WSL and the Windows browser agree
+      on one origin (cookies stay first-party).
+- [x] No script depends on a Windows path separator or a `cmd` builtin.
+- [x] `docs/linux-wsl.md` records the platform differences that matter.
+
+---
+
+## Carried into Week 4
+
+1. **Batch queue** — `POST /internal/drain` is written but unarmed (`CRON_SECRET` empty, no cron
+   entry). Grading is synchronous per submission today; a cohort of 200 needs the queue.
+2. **Distributed rate limiting** — the limiter is per warm instance, so Vercel's instance count
+   multiplies the effective limit.
+3. **CI** — tests run locally only; nothing gates a merge yet.
+4. **Cohort analytics** — per-metric averages and per-question difficulty need the aggregate
+   queries the Week 3 filters already imply.
+
+---
+
 ## Carried into Week 2 (logged, not forgotten)
 
 1. `sanitizer_run` promoted from evidence-only to a candidate graded metric — ASan worked

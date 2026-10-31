@@ -8,15 +8,31 @@ import { asyncHandler, conflict, notFound, send } from '../lib/http.js';
 import { sha256Hex } from '../lib/hash.js';
 import { prepareEvaluationKey, reportForEvaluation, runEvaluation } from '../grading/coordinator.js';
 import { resolveRules } from '../grading/rules.js';
+import { createRateLimiter } from '../lib/rateLimit.js';
+import { reviewMatch, scanAssignment } from '../grading/similarity-scan.js';
 import {
   canSeeReport,
+  createSubmissionRecord,
   latestEvaluation,
   loadSubmissionForViewer,
+  scheduleGrading,
   serialiseSubmission,
-  submitAndGrade,
 } from '../services/submission-service.js';
 
 export const submissionsRouter = Router();
+
+/**
+ * Day 21: ten uploads per hour per account. A submission is the only route that
+ * spends sandbox quota, so it is the only one that needs a ceiling tighter than
+ * "whatever the browser allows".
+ */
+export const submissionLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyFn: (req) => `submit:${req.user?.id ?? req.ip}`,
+  code: 'SUBMISSION_RATE_LIMITED',
+  message: 'You have submitted 10 times this hour. Wait a little before uploading again.',
+});
 
 // Auth is per-route: this router is mounted at `/api`, so a blanket middleware
 // would also intercept unauthenticated routes such as `/api/health`.
@@ -37,6 +53,7 @@ submissionsRouter.post(
   '/assignments/:id/submissions',
   requireAuth,
   requireRole('STUDENT'),
+  submissionLimiter,
   asyncHandler(async (req, res) => {
     const assignmentId = assertUuid(req.params.id);
     const assignment = await prisma.assignment.findUnique({
@@ -53,21 +70,27 @@ submissionsRouter.post(
       })
       .parse(req.body);
 
-    const { submission, evaluation } = await submitAndGrade({
+    const { submission, evaluation } = await createSubmissionRecord({
       assignment,
       student: req.user,
       filename: body.filename,
       source: body.source,
     });
 
+    // Day 15: the request answers as soon as the work is queued. Grading starts
+    // on the next tick, so the student sees `queued -> compiling -> testing ->
+    // analyzing` instead of a spinner with no information for ten seconds.
+    setImmediate(() => scheduleGrading(evaluation.id));
+
     const visible = canSeeReport(assignment, submission, req.user);
     return send(
       res,
       {
         submission: serialiseSubmission(submission, evaluation, { includeGrade: visible }),
+        pollUrl: `/api/submissions/${submission.id}`,
         reportAvailable: visible && Boolean(evaluation?.reportHash),
       },
-      201,
+      202,
     );
   }),
 );
@@ -175,7 +198,20 @@ submissionsRouter.post(
     });
 
     await prisma.auditLog.create({
-      data: { actorId: req.user.id, action: 'evaluation.regrade', entity: 'submission', entityId: submission.id, metadata: { reason: body.reason, evaluationId: created.id, previousId: previous.id } },
+      data: {
+        actorId: req.user.id,
+        action: 'evaluation.regrade',
+        entity: 'submission',
+        entityId: submission.id,
+        // `assignmentId` is what the activity feed filters on, so every action
+        // that can change a grade records it.
+        metadata: {
+          assignmentId: submission.assignmentId,
+          reason: body.reason,
+          evaluationId: created.id,
+          previousId: previous.id,
+        },
+      },
     });
 
     await runEvaluation(created.id);
@@ -211,7 +247,12 @@ submissionsRouter.patch(
 
 const cohortFilters = z.object({
   q: z.string().trim().max(120).optional().default(''),
-  status: z.enum(['ANY', 'QUEUED', 'RUNNING', 'SUCCEEDED', 'PARTIAL', 'FAILED']).optional().default('ANY'),
+  // `NO_SUBMISSION` and `NOT_GRADED` are synthesised by the cohort query for
+  // enrolled students who have not uploaded, so the filter has to accept them.
+  status: z
+    .enum(['ANY', 'QUEUED', 'RUNNING', 'SUCCEEDED', 'PARTIAL', 'FAILED', 'NOT_GRADED', 'NO_SUBMISSION'])
+    .optional()
+    .default('ANY'),
   minGrade: z.coerce.number().min(0).max(100).optional(),
   maxGrade: z.coerce.number().min(0).max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -219,6 +260,10 @@ const cohortFilters = z.object({
   sort: z.enum(['name', 'grade', 'submitted']).default('name'),
   direction: z.enum(['asc', 'desc']).default('asc'),
   unreleasedOnly: z.enum(['true', 'false']).optional().default('false'),
+  // Day 18: "flagged only" means "has a similarity match at or above the rule
+  // set's threshold", not "score is odd" - it comes from the same table the
+  // originality metric writes to.
+  flaggedOnly: z.enum(['true', 'false']).optional().default('false'),
 });
 
 async function cohortRows(assignmentId, filters) {
@@ -296,6 +341,15 @@ async function cohortRows(assignmentId, filters) {
   if (filters.minGrade !== undefined) items = items.filter((item) => item.percent != null && item.percent >= filters.minGrade);
   if (filters.maxGrade !== undefined) items = items.filter((item) => item.percent != null && item.percent <= filters.maxGrade);
   if (filters.unreleasedOnly === 'true') items = items.filter((item) => item.submissionId && !item.releasedAt);
+
+  if (filters.flaggedOnly === 'true') {
+    const matches = await prisma.similarityMatch.findMany({
+      where: { assignmentId },
+      select: { submissionA: true, submissionB: true },
+    });
+    const flagged = new Set(matches.flatMap((match) => [match.submissionA, match.submissionB]));
+    items = items.filter((item) => item.submissionId && flagged.has(item.submissionId));
+  }
 
   const dir = filters.direction === 'asc' ? 1 : -1;
   items.sort((a, b) => {
@@ -380,6 +434,46 @@ submissionsRouter.get(
   }),
 );
 
+/* -------------------------------------------------------------- activity */
+
+/**
+ * Day 18: a small activity feed. When a grade changes under a student's feet,
+ * "who did that and when" has to be answerable without reading the database.
+ */
+submissionsRouter.get(
+  '/assignments/:id/activity',
+  requireAuth,
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) => {
+    const assignment = await loadOwnedAssignment(req.params.id, req.user.id);
+    const take = z.coerce.number().int().min(1).max(50).default(20).parse(req.query.limit ?? 20);
+
+    const entries = await prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { entity: 'assignment', entityId: assignment.id },
+          { metadata: { path: ['assignmentId'], equals: assignment.id } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+      include: { actor: { select: { fullName: true, email: true } } },
+    });
+
+    return send(res, {
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        entity: entry.entity,
+        entityId: entry.entityId,
+        metadata: entry.metadata,
+        createdAt: entry.createdAt,
+        actor: entry.actor ? { fullName: entry.actor.fullName, email: entry.actor.email } : null,
+      })),
+    });
+  }),
+);
+
 /* ------------------------------------------------------------ similarity */
 
 submissionsRouter.get(
@@ -416,7 +510,81 @@ submissionsRouter.get(
         b: byId.get(match.submissionB)
           ? { submissionId: match.submissionB, student: byId.get(match.submissionB).student, attempt: byId.get(match.submissionB).attempt }
           : null,
+        reviewedAt: match.reviewedAt,
+        reviewNote: match.reviewNote,
+        matchedSpan: match.matchedSpan,
       })),
+    });
+  }),
+);
+
+/**
+ * Day 19: the whole-assignment scan.
+ *
+ * The per-submission analyzer only ever sees the corpus at the moment one
+ * student uploads, so a pair can be missed if the second upload happened before
+ * the first was graded. This endpoint compares everything on demand.
+ */
+submissionsRouter.post(
+  '/assignments/:id/similarity/scan',
+  requireAuth,
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) => {
+    const assignment = await loadOwnedAssignment(req.params.id, req.user.id);
+    const body = z
+      .object({
+        shingle_size: z.coerce.number().int().min(3).max(20).optional(),
+        num_perm: z.coerce.number().int().min(32).max(512).optional(),
+        seed: z.coerce.number().int().min(0).max(1_000_000).optional(),
+        flag_threshold: z.coerce.number().min(0.5).max(1).optional(),
+      })
+      .parse(req.body ?? {});
+
+    const summary = await scanAssignment(assignment.id, body);
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action: 'similarity.scan',
+        entity: 'assignment',
+        entityId: assignment.id,
+        metadata: { ...summary, assignmentId: assignment.id },
+      },
+    });
+
+    return send(res, summary);
+  }),
+);
+
+/** Record that a human looked at a pair. It never changes a grade. */
+submissionsRouter.patch(
+  '/similarity/:matchId/review',
+  requireAuth,
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) => {
+    const matchId = assertUuid(req.params.matchId);
+    const body = z
+      .object({ reviewed: z.boolean().default(true), note: z.string().max(500).optional() })
+      .parse(req.body ?? {});
+
+    const match = await prisma.similarityMatch.findUnique({ where: { id: matchId } });
+    if (!match) throw notFound('Similarity match not found');
+    await loadOwnedAssignment(match.assignmentId, req.user.id);
+
+    const updated = await reviewMatch(matchId, { reviewed: body.reviewed, note: body.note, reviewerId: req.user.id });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action: body.reviewed ? 'similarity.reviewed' : 'similarity.reopened',
+        entity: 'similarity_match',
+        entityId: match.id,
+        metadata: { assignmentId: match.assignmentId, similarity: match.similarity, note: body.note ?? null },
+      },
+    });
+
+    return send(res, {
+      match: { id: updated.id, reviewedAt: updated.reviewedAt, reviewNote: updated.reviewNote },
     });
   }),
 );

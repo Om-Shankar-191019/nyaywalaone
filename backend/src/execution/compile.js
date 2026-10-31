@@ -4,7 +4,7 @@ import { sha256Hex } from '../lib/hash.js';
 import { stableStringify } from '../grading/canonical-utils.js';
 import { recordUsage } from './budget.js';
 import { DEFAULT_COMPILER_OPTIONS, resolveLimits } from './limits.js';
-import { getProvider } from './provider.js';
+import { capabilitiesOf, getProvider } from './provider.js';
 
 /** The rules file speaks seconds and megabytes; the provider speaks CPU and KB. */
 export function limitsFromRules(limits = {}) {
@@ -73,9 +73,23 @@ export async function runCached({
   return { ...output, cached: false };
 }
 
-export const compilerOptionsFrom = (rules) => {
+export const requestedCompilerOptions = (rules) => {
   const syntax = rules?.metrics?.find((metric) => metric.analyzer === 'compiler_warnings');
   return syntax?.params?.flags ?? DEFAULT_COMPILER_OPTIONS;
+};
+
+/**
+ * Flags actually handed to the provider.
+ *
+ * `null` means "this sandbox compiles with fixed flags and cannot be told
+ * otherwise" - onlinecompiler.io runs `gcc -O2 code.c -o code.out -lm` and
+ * exposes no options field. Returning the requested string anyway would put a
+ * flag into the evaluation key that never reached a compiler, so two runs with
+ * different flags would look like different toolchains when nothing changed.
+ */
+export const compilerOptionsFrom = (rules, providerName) => {
+  const capabilities = capabilitiesOf(providerName);
+  return capabilities.compilerFlags ? requestedCompilerOptions(rules) : null;
 };
 
 export { config };

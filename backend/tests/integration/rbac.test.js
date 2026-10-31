@@ -159,6 +159,31 @@ describe('origin check', () => {
     assert.equal(response.status, 401, 'the origin passes and the credentials fail, as expected');
   });
 
+  it('allows the deployment\'s own origin, as a Vercel proxy presents it', async () => {
+    // The public host is not known at build time (every preview deploy gets a
+    // new one), so APP_ORIGIN cannot list it. Same-origin must still pass.
+    const response = await api()
+      .post('/api/auth/login')
+      .set('Origin', 'https://autograder-demo.vercel.app')
+      .set('X-Forwarded-Host', 'autograder-demo.vercel.app')
+      .set('X-Forwarded-Proto', 'https')
+      .send({ email: 'nobody@example.edu', password: 'whatever' });
+
+    assert.equal(response.status, 401, 'the origin passes and the credentials fail, as expected');
+  });
+
+  it('still blocks a foreign origin when proxy headers are present', async () => {
+    const response = await api()
+      .post('/api/auth/register')
+      .set('Origin', 'https://evil.example')
+      .set('X-Forwarded-Host', 'autograder-demo.vercel.app')
+      .set('X-Forwarded-Proto', 'https')
+      .send({ fullName: 'Eve', email: 'eve@example.edu', password: 'Correct-Horse-42', role: 'student' });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.error.code, 'CSRF_ORIGIN');
+  });
+
   it('allows non-browser clients that send no Origin', async () => {
     const response = await api().post('/api/auth/login').send({ email: 'nobody@example.edu', password: 'whatever' });
     assert.equal(response.status, 401);

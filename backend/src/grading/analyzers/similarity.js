@@ -119,11 +119,22 @@ export const similarityAnalyzer = {
       };
     }
 
+    // A stored signature is reusable only when the parameters that produced it
+    // match the ones this rule set asks for; a 7-shingle and a 10-shingle
+    // signature are not comparable, and pretending otherwise would invent a
+    // similarity score that means nothing.
+    const key = `s${params.shingle_size}-p${params.num_perm}-k${params.seed}`;
+    const signatureFor = (item) => {
+      const stored = item.signature;
+      if (Array.isArray(stored) && stored.length === params.num_perm && item.signatureParams?.key === key) return stored;
+      return minhashSignature(item.source, params);
+    };
+
     const signature = minhashSignature(ctx.source, params);
     const comparisons = peers.map((peer) => {
       const similarity = peer.sourceHash && peer.sourceHash === ctx.sourceHash
         ? 1
-        : jaccardEstimate(signature, minhashSignature(peer.source, params));
+        : jaccardEstimate(signature, signatureFor(peer));
       return {
         submissionId: peer.id,
         studentId: peer.studentId ?? null,

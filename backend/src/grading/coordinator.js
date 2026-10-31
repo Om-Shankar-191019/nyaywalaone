@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { sha256Hex } from '../lib/hash.js';
 import { AppError } from '../lib/http.js';
 import { assertWithinBudget } from '../execution/budget.js';
-import { compilerOptionsFrom, limitsFromRules, runCached } from '../execution/compile.js';
+import { compilerOptionsFrom, limitsFromRules, requestedCompilerOptions, runCached } from '../execution/compile.js';
+import { clampLimitsFor } from '../execution/limits.js';
+import { capabilitiesOf } from '../execution/provider.js';
 import { getToolchainFingerprint } from '../execution/toolchain.js';
 import { evaluationKey, reportHash, rulesHash as hashRules, testsetHash } from './canonical.js';
 import { compilerWarningsAnalyzer } from './analyzers/compiler-warnings.js';
@@ -11,6 +14,15 @@ import { registry } from './registry.js';
 import { resolveRules } from './rules.js';
 import { clamp01, contributionOf } from './score.js';
 import { ANALYZER_VERSIONS, GRADER_VERSION } from './versions.js';
+
+import { capabilitiesOf as capabilitiesFor } from '../execution/provider.js';
+
+/**
+ * The limitations wording lives in one versioned file (Day 20). Inlining these
+ * strings meant three branches of the coordinator could describe the same caveat
+ * three slightly different ways, and the text report drifted from the JSON.
+ */
+const LIMITATIONS = JSON.parse(readFileSync(new URL('./limitations.json', import.meta.url), 'utf8'));
 
 /** One slow analyzer must not hold a request open forever. */
 const ANALYZER_TIMEOUT_MS = 90_000;
@@ -39,9 +51,13 @@ export function stableEvidence(value) {
 export async function toolchainHashFor({ provider, compilerOptions, fingerprint }) {
   const pin = {
     provider,
-    language_id: config.JUDGE0_LANGUAGE_ID,
+    // The compiler identity is the fingerprint, not a Judge0 language id: Week 3
+    // runs on onlinecompiler.io, where `gcc-15` is the pin and a Judge0 id is
+    // just a number that never reached a compiler.
     compiler: fingerprint?.hash ?? 'unknown',
-    flags: compilerOptions,
+    // `null` means the sandbox chose the flags. Encoding that as a string keeps
+    // "provider default" distinct from any flag string a rule set could declare.
+    flags: compilerOptions ?? 'provider-default',
     analyzers: ANALYZER_VERSIONS,
     grader: GRADER_VERSION,
   };
@@ -50,7 +66,7 @@ export async function toolchainHashFor({ provider, compilerOptions, fingerprint 
 
 /** Everything an evaluation key is built from, computed in one place. */
 export async function prepareEvaluationKey({ assignment, sourceHash, rules, tests, provider }) {
-  const compilerOptions = compilerOptionsFrom(rules);
+  const compilerOptions = compilerOptionsFrom(rules, provider);
   const fingerprint = await getToolchainFingerprint(provider);
   const toolchainHash = await toolchainHashFor({ provider, compilerOptions, fingerprint });
 
@@ -167,16 +183,27 @@ export async function runEvaluation(evaluationId) {
   if (errors.length) {
     await prisma.evaluation.update({
       where: { id: evaluation.id },
-      data: { status: 'FAILED', failedReason: `invalid_rule_set: ${errors[0].path} ${errors[0].message}`, finishedAt: new Date() },
+      data: {
+        status: 'FAILED',
+        stage: 'failed',
+        failedReason: `invalid_rule_set: ${errors[0].path} ${errors[0].message}`,
+        finishedAt: new Date(),
+      },
     });
     throw new AppError(500, 'RULE_SET_INVALID', `Stored rule set cannot be executed: ${errors[0].path} ${errors[0].message}`);
   }
 
-  await prisma.evaluation.update({ where: { id: evaluation.id }, data: { status: 'RUNNING' } });
+  await prisma.evaluation.update({ where: { id: evaluation.id }, data: { status: 'RUNNING', stage: 'compiling' } });
 
   const provider = evaluation.provider;
-  const compilerOptions = compilerOptionsFrom(rules);
-  const limits = limitsFromRules(rules.limits);
+  // What this sandbox can actually be asked to do. Everything downstream - the
+  // compiler flags, the limits, the report's limitations block - reads this
+  // rather than assuming Judge0's feature set.
+  const capabilities = capabilitiesOf(provider);
+  const compilerOptions = compilerOptionsFrom(rules, provider);
+  const limits = clampLimitsFor(capabilities, limitsFromRules(rules.limits));
+  const setStage = (stage) =>
+    prisma.evaluation.update({ where: { id: evaluation.id }, data: { stage } }).catch(() => {});
   const tests = assignment.testCases.map((test) => ({
     name: test.name,
     stdin: test.stdin,
@@ -185,12 +212,45 @@ export async function runEvaluation(evaluationId) {
   }));
   const referenceHash = assignment.referenceSolution ? sha256Hex(assignment.referenceSolution) : null;
 
+  const corpusSelect = {
+    id: true,
+    studentId: true,
+    source: true,
+    sourceHash: true,
+    attempt: true,
+    // Cached signatures make the pairwise compare integer-only when the same
+    // parameters are used, instead of re-tokenising every peer per grade.
+    signature: true,
+    signatureParams: true,
+  };
+
   const corpus =
     (await prisma.submission.findMany({
       // A student's own earlier attempts are not a similarity signal.
       where: { assignmentId: assignment.id, studentId: { not: submission.studentId } },
-      select: { id: true, studentId: true, source: true, sourceHash: true, attempt: true },
+      select: corpusSelect,
     })) ?? [];
+
+  // `assignment+archive` widens the corpus to previous assignments in the same
+  // course - never to other instructors' courses, which would leak one class's
+  // work into another's similarity evidence.
+  const similarityRule = rules.metrics.find((metric) => metric.analyzer === 'similarity_flag');
+  const wantsArchive = similarityRule?.params?.corpus === 'assignment+archive';
+  let archiveCount = 0;
+  if (wantsArchive) {
+    const archive = await prisma.submission.findMany({
+      where: {
+        assignmentId: { not: assignment.id },
+        assignment: { courseId: assignment.courseId },
+        studentId: { not: submission.studentId },
+      },
+      select: corpusSelect,
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    archiveCount = archive.length;
+    corpus.push(...archive);
+  }
 
   const ctx = {
     source: submission.source,
@@ -202,10 +262,13 @@ export async function runEvaluation(evaluationId) {
     reference: assignment.referenceSolution,
     referenceHash,
     compilerOptions,
+    requestedCompilerOptions: requestedCompilerOptions(rules),
     limits,
+    capabilities,
     corpus,
     provider,
     allowNoOracle: assignment.allowNoOracle,
+    archiveCount,
     flags: {},
   };
 
@@ -214,7 +277,7 @@ export async function runEvaluation(evaluationId) {
   } catch (error) {
     await prisma.evaluation.update({
       where: { id: evaluation.id },
-      data: { status: 'FAILED', failedReason: 'budget_exhausted', finishedAt: new Date() },
+      data: { status: 'FAILED', stage: 'failed', failedReason: 'budget_exhausted', finishedAt: new Date() },
     });
     throw error;
   }
@@ -226,6 +289,8 @@ export async function runEvaluation(evaluationId) {
     compilerOptions,
     limits,
   });
+
+  await setStage('testing');
 
   let results;
   let partial = false;
@@ -255,6 +320,7 @@ export async function runEvaluation(evaluationId) {
   } else {
     // The program compiled. Its exit status on empty stdin is the analyzers'
     // business, not the gate's.
+    await setStage('analyzing');
     results = await mapLimit(rules.metrics, config.GRADING_CONCURRENCY, async (rule) => {
       const base = { name: rule.name, analyzer: rule.analyzer, weight: rule.weight };
       const analyzer = registry.get(rule.analyzer);
@@ -334,6 +400,7 @@ export async function runEvaluation(evaluationId) {
     fingerprint,
     partial,
     failedReason,
+    capabilities,
   });
 
   await prisma.$transaction([
@@ -358,6 +425,7 @@ export async function runEvaluation(evaluationId) {
       where: { id: evaluation.id },
       data: {
         status: partial ? 'PARTIAL' : 'SUCCEEDED',
+        stage: 'done',
         gradeHundredths,
         reportHash: reportView.hash,
         failedReason,
@@ -384,7 +452,7 @@ const reportContent = (report) => ({
  * The report payload. Pure: same rows in, same bytes out. `timing`-class keys
  * are removed by `stableEvidence`, so the hash survives a cache-hot rerun.
  */
-export function buildReportView({ evaluation, submission, assignment, ruleset, rules, metrics, tests, fingerprint, partial, failedReason }) {
+export function buildReportView({ evaluation, submission, assignment, ruleset, rules, metrics, tests, fingerprint, partial, failedReason, capabilities }) {
   const flags = {
     review_recommended: metrics.filter((metric) => metric.status !== 'ok').map((metric) => metric.name),
     suspected_infinite_loop: metrics.some((metric) => metric.evidence?.suspected_infinite_loop),
@@ -392,13 +460,29 @@ export function buildReportView({ evaluation, submission, assignment, ruleset, r
     no_oracle: Boolean(metrics.find((m) => m.analyzer === 'edge_case_runner')?.evidence?.no_oracle),
   };
 
-  const limitations = [];
-  if (!assignment.referenceSolution) limitations.push('No reference solution is set, so edge cases are checked for well-formed output only.');
-  if (!tests.length) limitations.push('No test cases are attached to this assignment, so correctness and edge cases are unmeasured.');
+  // Collected as keys, then emitted in a fixed order, so the report bytes do not
+  // depend on the order the analyzers happened to finish in.
+  const limitationKeys = new Set();
+  if (!assignment.referenceSolution) limitationKeys.add('no_reference_solution');
+  if (!tests.length) limitationKeys.add('no_tests');
   if (metrics.some((metric) => metric.analyzer === 'llm_review' && metric.status === 'unavailable')) {
-    limitations.push('The optional language-model review is not configured or not enabled for this rule set.');
+    limitationKeys.add('llm_unavailable');
   }
-  if (failedReason === 'compile_error') limitations.push('The program did not compile; every metric except syntax is reported as unavailable.');
+  if (failedReason === 'compile_error') limitationKeys.add('compile_error');
+  if (metrics.some((metric) => metric.evidence?.reason === 'provider_has_no_compiler_flags')) {
+    limitationKeys.add('no_compiler_flags');
+  }
+  if (metrics.some((metric) => metric.evidence?.reason === 'no_peer_submissions')) limitationKeys.add('no_peers');
+  if (metrics.some((metric) => metric.evidence?.no_oracle === true)) limitationKeys.add('no_oracle');
+  if (metrics.some((metric) => metric.status === 'unavailable')) limitationKeys.add('analyzer_failed');
+
+  const caps = capabilities ?? capabilitiesFor(evaluation.provider);
+  if (!caps.memoryLimit || !caps.processLimit) limitationKeys.add('provider_limits');
+  if (caps.perRunTimeLimit && caps.maxTimeLimitSeconds) limitationKeys.add('sandbox_limits');
+
+  const limitations = Object.entries(LIMITATIONS.entries)
+    .filter(([key]) => limitationKeys.has(key))
+    .map(([, text]) => text);
 
   const report = {
     schema_version: '2.0',
@@ -454,10 +538,29 @@ export function buildReportView({ evaluation, submission, assignment, ruleset, r
       fingerprint_hash: fingerprint?.hash ?? 'unknown',
       analyzer_versions: ANALYZER_VERSIONS,
     },
+    usefulness: LIMITATIONS.usefulness,
+    limitations_version: LIMITATIONS.version,
     limitations,
   };
 
   return { report, hash: reportHash(reportContent(report)) };
+}
+
+/** Wrap prose to a fixed column, so the .txt report reads well in any editor. */
+function wrap(text, width = 96) {
+  const words = String(text ?? '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    if (line && `${line} ${word}`.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
 }
 
 /** Plain-text report, for the "Download .txt" button and for email later. */
@@ -488,7 +591,10 @@ export function renderReportText(view) {
     ...(report.flags.review_recommended.length ? [`Review recommended: ${report.flags.review_recommended.join(', ')}`] : []),
     ...(report.flags.suspected_infinite_loop ? ['Suspected infinite loop: an earlier test exceeded its time limit.'] : []),
     ...(report.flags.identical_copy ? ['Identical copy: an exact source match was found in this assignment.'] : []),
-    ...(report.limitations.length ? ['', 'Limitations', ...report.limitations.map((line) => `- ${line}`)] : []),
+    '',
+    'Usefulness and limitations',
+    ...wrap(report.usefulness ?? '', 96).map((line) => `  ${line}`),
+    ...(report.limitations.length ? ['', 'Limitations', ...report.limitations.map((line) => `  - ${line}`)] : []),
     '',
     'Scores are reproducible from the evaluation key; wall-clock timings are excluded from the report hash.',
   ];
@@ -528,6 +634,7 @@ export async function reportForEvaluation(evaluationId) {
     fingerprint,
     partial: evaluation.status === 'PARTIAL',
     failedReason: evaluation.failedReason,
+    capabilities: capabilitiesFor(evaluation.provider),
   });
 
   return {

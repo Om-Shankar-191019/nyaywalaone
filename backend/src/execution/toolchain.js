@@ -1,8 +1,8 @@
 import { prisma } from '../db.js';
 import { sha256Hex } from '../lib/hash.js';
 import { AppError } from '../lib/http.js';
-import { DEFAULT_LIMITS } from './limits.js';
-import { getProvider } from './provider.js';
+import { DEFAULT_LIMITS, clampLimitsFor } from './limits.js';
+import { capabilitiesOf, getProvider } from './provider.js';
 import { STATUS } from './status.js';
 
 /**
@@ -25,10 +25,13 @@ const sameUtcDay = (a, b) => a.toISOString().slice(0, 10) === b.toISOString().sl
 export async function captureToolchainFingerprint(providerName) {
   const provider = getProvider(providerName);
 
+  // A probe that only uses printf compiles under any standard, so it works on a
+  // sandbox with fixed flags as well as on one that honours `-std=c11`.
+  const capabilities = capabilitiesOf(provider.name);
   const result = await provider.run({
     source: PROBE_SOURCE,
-    compilerOptions: '-std=c11',
-    limits: { ...DEFAULT_LIMITS, cpuTimeLimitSeconds: 2, wallTimeLimitSeconds: 10 },
+    compilerOptions: capabilities.compilerFlags ? '-std=c11' : null,
+    limits: clampLimitsFor(capabilities, { ...DEFAULT_LIMITS, cpuTimeLimitSeconds: 2, wallTimeLimitSeconds: 10 }),
   });
 
   if (result.status.code !== STATUS.ACCEPTED) {

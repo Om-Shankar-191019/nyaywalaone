@@ -1,11 +1,15 @@
 import { config } from '../config.js';
 import { prisma } from '../db.js';
+import { looksBinary } from '../lib/guards.js';
 import { AppError, badRequest, conflict, notFound } from '../lib/http.js';
-import { normalizeSource, sourceHash } from '../lib/hash.js';
+import { normalizeSource, sha256Hex, sourceHash } from '../lib/hash.js';
 import { prepareEvaluationKey, runEvaluation } from '../grading/coordinator.js';
 import { resolveRules } from '../grading/rules.js';
 
 const MAX_FILENAME = 120;
+
+/** Stages the UI polls. A grade is not predictable, so progress is named. */
+export const STAGES = Object.freeze(['queued', 'compiling', 'testing', 'analyzing', 'done', 'failed']);
 
 export const canSeeReport = (assignment, submission, user) => {
   if (user.role === 'INSTRUCTOR') return true;
@@ -29,6 +33,8 @@ export function serialiseSubmission(submission, evaluation, { includeGrade }) {
       ? {
           id: evaluation.id,
           status: evaluation.status,
+          // Day 15: what the polling UI shows while a grade is being produced.
+          stage: evaluation.stage ?? (evaluation.status === 'SUCCEEDED' ? 'done' : 'queued'),
           gradeHundredths: includeGrade ? evaluation.gradeHundredths : null,
           reportHash: includeGrade ? evaluation.reportHash : null,
           failedReason: includeGrade ? evaluation.failedReason : null,
@@ -48,17 +54,37 @@ export async function latestEvaluation(submissionId) {
 }
 
 /**
- * Upload and grade. The submission row is written first so a provider failure
- * never loses a student's work; the evaluation is keyed by content, so a
- * double-click cannot spend budget twice.
+ * Duplicate work is impossible to avoid entirely - two students can submit the
+ * same correct solution, and a student can re-upload the same file. The
+ * evaluation key is content-addressed, so the second identical submission would
+ * otherwise attach to the *first* student's evaluation row, and its own report
+ * lookup would return nothing.
+ *
+ * The fix is a per-submission salt: identical content still hits the execution
+ * cache (so no extra provider spend) but each submission owns a report, and the
+ * new row points at the original through `lineageOfId`.
  */
-export async function submitAndGrade({ assignment, student, filename, source }) {
+export function submissionScopedKey(baseKey, submissionId) {
+  return sha256Hex(`${baseKey}:${submissionId}`);
+}
+
+/**
+ * Validate and persist one attempt. Nothing here talks to the sandbox, so the
+ * request finishes in milliseconds and the UI gets an id to poll immediately.
+ */
+export async function createSubmissionRecord({ assignment, student, filename, source }) {
   if (!assignment.activeRuleSetId) {
     throw conflict('ASSIGNMENT_NOT_PUBLISHED', 'This assignment has no published rule set yet, so it cannot be graded.');
   }
 
   const trimmedSource = String(source ?? '');
   if (!trimmedSource.trim()) throw badRequest('The source file is empty');
+  // Day 21 input hardening: a NUL byte means the upload was not text, whatever
+  // the extension said. Rejecting here keeps binary out of the cache and the DB.
+  if (trimmedSource.includes('\u0000')) throw badRequest('The file contains a null byte, so it is not a text source file.');
+  if (looksBinary(trimmedSource)) {
+    throw badRequest('The file is not text: it contains too many control characters to be C source.');
+  }
   if (Buffer.byteLength(trimmedSource, 'utf8') > config.maxSourceBytes) {
     throw badRequest(`Source exceeds the ${Math.round(config.maxSourceBytes / 1024)} KB limit`);
   }
@@ -121,34 +147,75 @@ export async function submitAndGrade({ assignment, student, filename, source }) 
     provider: config.EXECUTION_PROVIDER,
   });
 
-  let evaluation = await prisma.evaluation.findUnique({ where: { evaluationKey: prep.key } });
-  if (!evaluation) {
-    evaluation = await prisma.evaluation.create({
-      data: {
-        submissionId: submission.id,
-        rulesetId: ruleset.id,
-        evaluationKey: prep.key,
-        status: 'QUEUED',
-        provider: prep.provider,
-        toolchainFingerprint: prep.toolchain_hash,
-        graderVersion: '2.0.0',
-      },
-    });
-  }
+  const collision = await prisma.evaluation.findUnique({
+    where: { evaluationKey: prep.key },
+    select: { id: true, submissionId: true },
+  });
 
-  if (evaluation.status === 'QUEUED' || evaluation.status === 'FAILED') {
-    try {
-      await runEvaluation(evaluation.id);
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw new AppError(502, 'GRADING_FAILED', 'Grading could not complete. The submission is saved and can be re-graded.', {
-        reason: String(error.message ?? error).slice(0, 300),
-      });
-    }
-  }
+  const evaluation = await prisma.evaluation.create({
+    data: {
+      submissionId: submission.id,
+      rulesetId: ruleset.id,
+      evaluationKey: collision && collision.submissionId !== submission.id ? submissionScopedKey(prep.key, submission.id) : prep.key,
+      status: 'QUEUED',
+      stage: 'queued',
+      provider: prep.provider,
+      toolchainFingerprint: prep.toolchain_hash,
+      graderVersion: '2.0.0',
+      lineageOfId: collision && collision.submissionId !== submission.id ? collision.id : null,
+    },
+  });
 
-  const fresh = await prisma.evaluation.findUnique({ where: { id: evaluation.id }, include: { metrics: { orderBy: { ordinal: 'asc' } } } });
-  return { submission, evaluation: fresh, rules };
+  return { submission, evaluation, rules, ruleset, tests };
+}
+
+/**
+ * Grading runs after the response, because a submission must not hold a request
+ * open for a compiler and ten analyzers. If the process dies mid-flight the row
+ * stays `QUEUED` and `/api/internal/drain` picks it up, so the work is never
+ * lost - only delayed.
+ */
+const inFlight = new Map();
+
+export function scheduleGrading(evaluationId) {
+  if (inFlight.has(evaluationId)) return inFlight.get(evaluationId);
+
+  const task = Promise.resolve()
+    .then(() => runEvaluation(evaluationId))
+    .catch(async (error) => {
+      // `runEvaluation` records known failures itself; this catches the rest so a
+      // crashed grade never leaves a row stuck on RUNNING for the UI to poll.
+      const reason = String(error?.code ?? 'grading_failed').slice(0, 120);
+      await prisma.evaluation
+        .updateMany({
+          where: { id: evaluationId, status: { in: ['QUEUED', 'RUNNING'] } },
+          data: { status: 'FAILED', stage: 'failed', failedReason: reason, finishedAt: new Date() },
+        })
+        .catch(() => {});
+      return null;
+    })
+    .finally(() => inFlight.delete(evaluationId));
+
+  inFlight.set(evaluationId, task);
+  return task;
+}
+
+/** Wait for the in-process task, if there is one. Used by scripts and tests. */
+export const gradingDone = (evaluationId) => inFlight.get(evaluationId) ?? Promise.resolve(null);
+
+/**
+ * Upload, persist and grade in one call. The HTTP route uses the split version
+ * (respond, then schedule); this stays for scripts and for the regression tests
+ * that want a finished report in a single await.
+ */
+export async function submitAndGrade({ assignment, student, filename, source }) {
+  const created = await createSubmissionRecord({ assignment, student, filename, source });
+  await scheduleGrading(created.evaluation.id);
+  const fresh = await prisma.evaluation.findUnique({
+    where: { id: created.evaluation.id },
+    include: { metrics: { orderBy: { ordinal: 'asc' } } },
+  });
+  return { submission: created.submission, evaluation: fresh, rules: created.rules };
 }
 
 export async function loadSubmissionForViewer(submissionId, user) {
@@ -171,3 +238,4 @@ export async function loadSubmissionForViewer(submissionId, user) {
 
   return { submission, assignment: submission.assignment, viewer: isInstructor ? 'instructor' : 'student' };
 }
+
