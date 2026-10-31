@@ -10,6 +10,7 @@ import { prepareEvaluationKey, reportForEvaluation, runEvaluation } from '../gra
 import { resolveRules } from '../grading/rules.js';
 import { createRateLimiter } from '../lib/rateLimit.js';
 import { reviewMatch, scanAssignment } from '../grading/similarity-scan.js';
+import { drain, queueDepth } from '../services/queue.js';
 import {
   canSeeReport,
   createSubmissionRecord,
@@ -383,6 +384,97 @@ submissionsRouter.get(
         missing: all.filter((item) => item.noAttempt).length,
         unreleased: all.filter((item) => item.submissionId && !item.releasedAt).length,
       },
+    });
+  }),
+);
+
+/* ------------------------------------------------------- batch grading */
+
+/**
+ * Day 23: grade the whole cohort. The endpoint only *enqueues*; grading happens
+ * on the queue, so a 200-student assignment does not hold the request open and
+ * a partial run is resumable by calling it again.
+ */
+submissionsRouter.post(
+  '/assignments/:id/grade-all',
+  requireAuth,
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) => {
+    const assignment = await loadOwnedAssignment(req.params.id, req.user.id);
+    const body = z
+      .object({ includeFailed: z.boolean().default(true), start: z.boolean().default(true) })
+      .parse(req.body ?? {});
+
+    const statuses = body.includeFailed ? ['QUEUED', 'FAILED'] : ['QUEUED'];
+    const pending = await prisma.evaluation.findMany({
+      where: { submission: { assignmentId: assignment.id }, status: { in: statuses } },
+      select: { id: true, status: true },
+    });
+
+    // A manual regrade is a fresh decision: a row that burned its retries is
+    // given its budget back rather than failing again on the next cron tick.
+    const requeued = await prisma.evaluation.updateMany({
+      where: { id: { in: pending.map((row) => row.id) } },
+      data: { status: 'QUEUED', stage: 'queued', attemptCount: 0, claimedAt: null, failedReason: null, finishedAt: null },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user.id,
+        action: 'assignment.grade_all',
+        entity: 'assignment',
+        entityId: assignment.id,
+        metadata: { queued: requeued.count, includeFailed: body.includeFailed },
+      },
+    });
+
+    // Kick the queue once so the first rows move without waiting for cron.
+    if (body.start && !config.isTest && requeued.count > 0) {
+      setImmediate(() => drain({ limit: Math.min(3, requeued.count) }).catch(() => {}));
+    }
+
+    return send(res, {
+      assignmentId: assignment.id,
+      queued: requeued.count,
+      total: await prisma.evaluation.count({ where: { submission: { assignmentId: assignment.id } } }),
+      queue: await queueDepth(),
+    });
+  }),
+);
+
+/**
+ * Progress counters for the cohort view. `unreleased` is separate from `graded`
+ * on purpose: a grade can exist and still be invisible to the student.
+ */
+submissionsRouter.get(
+  '/assignments/:id/grading-progress',
+  requireAuth,
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) => {
+    const assignment = await loadOwnedAssignment(req.params.id, req.user.id);
+    const grouped = await prisma.evaluation.groupBy({
+      by: ['status'],
+      where: { submission: { assignmentId: assignment.id } },
+      _count: { _all: true },
+    });
+
+    const counts = Object.fromEntries(grouped.map((row) => [row.status, row._count._all]));
+    const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+    const done = (counts.SUCCEEDED ?? 0) + (counts.PARTIAL ?? 0);
+
+    return send(res, {
+      assignmentId: assignment.id,
+      counts: {
+        queued: counts.QUEUED ?? 0,
+        running: counts.RUNNING ?? 0,
+        succeeded: counts.SUCCEEDED ?? 0,
+        partial: counts.PARTIAL ?? 0,
+        failed: counts.FAILED ?? 0,
+        total,
+        done,
+      },
+      percent: total ? Math.round((done / total) * 1000) / 10 : 0,
+      queue: await queueDepth(),
     });
   }),
 );

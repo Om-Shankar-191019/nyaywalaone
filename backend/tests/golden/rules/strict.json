@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "problem": "sum_two_integers_strict",
+  "limits": { "time_limit_s": 1, "memory_limit_mb": 32, "max_processes": 16 },
+  "on_unavailable": "zero",
+  "metrics": [
+    { "name": "correctness", "analyzer": "io_tests", "weight": 0.25, "params": { "testset": "assignment", "partial_credit": false } },
+    { "name": "syntax", "analyzer": "compiler_warnings", "weight": 0.2, "params": { "flags": "-Wall -Wextra -Werror -std=c11", "warnings_as_errors": true, "penalty_per_warning": 0.25 } },
+    { "name": "structure", "analyzer": "static_analysis", "weight": 0.15, "params": { "max_cyclomatic": 4, "max_function_length": 20, "max_nesting": 2, "scoring": "linear", "min_score": 0 } },
+    { "name": "modularity", "analyzer": "function_split", "weight": 0.05, "params": { "min_functions": 3, "expect_helpers": true, "max_main_lines": 15 } },
+    { "name": "logical", "analyzer": "edge_case_runner", "weight": 0.15, "params": { "cases": ["zero", "negatives", "int_overflow", "whitespace", "boundary"], "no_oracle_cap": 0.0 } },
+    { "name": "complexity", "analyzer": "complexity_estimator", "weight": 0.05, "params": { "required": "O(1)", "sizes": [1, 10, 100], "mode": "static", "timing_evidence": false } },
+    { "name": "memory_safety", "analyzer": "memory_audit", "weight": 0.1, "params": { "check_leaks": true, "check_unchecked_alloc": true, "banned_functions": ["gets", "strcpy", "sprintf", "malloc"], "sanitizer_run": false } },
+    { "name": "readability", "analyzer": "style_analysis", "weight": 0.05, "params": { "min_name_length": 4, "min_comment_ratio": 0.08, "max_line_length": 80 } },
+    { "name": "originality", "analyzer": "similarity_flag", "weight": 0, "params": { "corpus": "assignment", "flag_threshold": 0.7, "shingle_size": 7, "num_perm": 128, "seed": 42 } }
+  ]
+}

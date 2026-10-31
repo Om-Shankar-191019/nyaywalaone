@@ -97,6 +97,21 @@ export async function createSubmissionRecord({ assignment, student, filename, so
     throw conflict('LATE_NOT_ALLOWED', `This assignment closed on ${assignment.dueAt.toISOString()}. Late submissions are not accepted.`);
   }
 
+  // Day 23: a per-student daily ceiling, independent of the global provider
+  // budget. The burst limiter above is per hour and per process; this one
+  // survives a restart and stops one account from consuming a whole day's quota.
+  const dayStart = new Date(now);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const todayCount = await prisma.submission.count({
+    where: { studentId: student.id, createdAt: { gte: dayStart } },
+  });
+  if (todayCount >= config.EXEC_USER_DAILY_SUBMISSIONS) {
+    throw conflict(
+      'DAILY_SUBMISSION_LIMIT',
+      `You have submitted ${todayCount} times today. The daily limit is ${config.EXEC_USER_DAILY_SUBMISSIONS}; it resets at 00:00 UTC.`,
+    );
+  }
+
   const ruleset = await prisma.ruleSet.findUnique({ where: { id: assignment.activeRuleSetId } });
   if (!ruleset) throw conflict('ASSIGNMENT_NOT_PUBLISHED', 'The active rule set is missing; re-publish the assignment.');
   const { rules, errors } = resolveRules(ruleset.rules);

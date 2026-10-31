@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
 import { config } from '../config.js';
 
@@ -36,6 +37,26 @@ export function notFoundHandler(req, res) {
 }
 
 // eslint-disable-next-line no-unused-vars -- Express identifies error middleware by arity.
+/**
+ * Prisma failure codes that mean "the deployment is not set up", not "the code
+ * is wrong". They are the difference between a 500 a user can never act on and
+ * a 503 that names the command that fixes it.
+ */
+const SCHEMA_ERROR_CODES = new Set(['P2021', 'P2022', 'P3005']);
+const CONNECTION_ERROR_CODES = new Set(['P1000', 'P1001', 'P1002', 'P1008', 'P1017']);
+
+/**
+ * A stable id per request, so the line in the log and the message on screen are
+ * the same event. Without it "the failure has been logged" is a claim nobody can
+ * follow up on.
+ */
+export function requestId(req, res, next) {
+  const provided = req.get('x-request-id');
+  req.id = (provided && /^[\w-]{8,64}$/.test(provided) ? provided : randomUUID()).slice(0, 64);
+  res.set('X-Request-Id', req.id);
+  next();
+}
+
 export function errorHandler(err, req, res, next) {
   if (err instanceof ZodError) {
     return res.status(400).json({
@@ -58,14 +79,41 @@ export function errorHandler(err, req, res, next) {
     return res.status(400).json({ error: { code: 'INVALID_JSON', message: 'Request body is not valid JSON' } });
   }
 
+  // A submission failing because the database was never migrated looks exactly
+  // like a bug from the browser. Name it, and name the command.
+  if (SCHEMA_ERROR_CODES.has(err?.code)) {
+    if (!config.isTest) console.error('[error:schema]', req.id, err.code, err.meta ?? '', err.message?.split('\n')[0]);
+    return res.status(503).json({
+      error: {
+        code: 'DB_SCHEMA_OUT_OF_DATE',
+        message:
+          'The database schema is behind the code. Run `npm run db:deploy` (prisma migrate deploy) against this database, then retry.',
+        details: { requestId: req.id, prismaCode: err.code },
+      },
+    });
+  }
+
+  if (CONNECTION_ERROR_CODES.has(err?.code)) {
+    if (!config.isTest) console.error('[error:db]', req.id, err.code, err.message?.split('\n')[0]);
+    return res.status(503).json({
+      error: {
+        code: 'DB_UNAVAILABLE',
+        message: 'The database is not reachable right now. Retry shortly; if it persists, check DATABASE_URL and the provider status.',
+        details: { requestId: req.id, prismaCode: err.code },
+      },
+    });
+  }
+
   if (!config.isTest) {
-    console.error('[error]', err);
+    console.error('[error]', req.id, err?.stack ?? err);
   }
 
   return res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
       message: 'Something went wrong on our side. The failure has been logged.',
+      // The browser shows the message; the id is what makes the log findable.
+      details: { requestId: req.id },
     },
   });
 }

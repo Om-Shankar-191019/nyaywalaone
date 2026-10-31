@@ -101,6 +101,11 @@ const envSchema = z.object({
   GROQ_BASE_URL: z.string().url().default('https://api.groq.com/openai/v1'),
   GROQ_MODEL: z.string().optional().default('llama-3.3-70b-versatile'),
   GRADING_CONCURRENCY: optionalNumber(z.coerce.number().int().min(1).max(8).default(3)),
+  // Day 23: provider calls allowed in flight, process-wide. onlinecompiler.io
+  // accepts two at a time; Judge0 tolerates more.
+  EXEC_MAX_INFLIGHT: optionalNumber(z.coerce.number().int().min(1).max(8).default(4)),
+  // Per-student daily submission cap, independent of the global provider cap.
+  EXEC_USER_DAILY_SUBMISSIONS: optionalNumber(z.coerce.number().int().min(1).max(1000).default(40)),
   // Shared secret for the queue drain endpoint; empty disables the endpoint.
   CRON_SECRET: z.string().optional().default(''),
 });

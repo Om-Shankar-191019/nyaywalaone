@@ -1,0 +1,48 @@
+Nyaywala evaluation report
+Submission      0d4667ad-e418-4790-a521-9b95cd07b693 (attempt 11)
+Assignment      8f53238c-a1b1-409f-bde6-0f1ac6798ca9
+Rule set        v1  add_two_integers
+Evaluation key  49ca804294e295cddb12b342ed431164354ac4f583519ec0d3a14d9afbd65cf5
+Grader          2.0.0   provider onlinecompiler
+Toolchain       gcc 15.3.0  (6d712385e104)
+
+GRADE           86.20 / 100
+
+Metric                 Analyzer               Score  Weight  Contrib  Status
+---------------------------------------------------------------------------
+correctness            io_tests                1.00    0.20     2000  ok
+syntax                 compiler_warnings       1.00    0.10     1000  partial
+structure              static_analysis         1.00    0.10     1000  ok
+modularity             function_split          0.60    0.10      600  ok
+logical                edge_case_runner        0.71    0.10      714  ok
+complexity             complexity_estimator    1.00    0.10     1000  ok
+memory_safety          memory_audit            1.00    0.10     1000  ok
+readability            style_analysis          0.40    0.10      400  ok
+originality            similarity_flag         0.91    0.10      906  ok
+readability_llm        llm_review              0.00    0.00        0  error
+
+- correctness: All 3 tests passed.
+- syntax: Compiled without errors. The sandbox uses a fixed compile line, so the -Wall -Wextra -std=c11 diagnostics requested by this rule set were not available.
+- structure: Structure is within bounds: worst function has cyclomatic complexity 2 and 6 lines.
+- modularity: Only 1 function; the rules expect at least 2.
+- logical: 2 of 7 boundary cases differ from the reference: int_overflow, int_overflow.
+- complexity: Loops and recursion put this at O(1), within the required O(1).
+- memory_safety: No memory-safety pattern was found.
+- readability: Readability: 91% of identifiers are one letter; comments cover 0.0% of lines.
+- originality: Most similar submission: 55%. Below the 85% review threshold.
+- readability_llm: The optional review was rejected by the provider; the rest of the report is unaffected.
+
+Review recommended: syntax
+
+Usefulness and limitations
+  This grade measures correctness against the assignment's tests, structure, memory discipline,
+  readability and originality. It does not measure whether the program is a good solution to the
+  problem, whether the student can explain it, or whether the design would survive a change in
+  requirements.
+
+Limitations
+  - The sandbox compiles with a fixed command line and cannot be given compiler flags, so the rule set's -Wall/-Wextra diagnostics were not available. Errors are still detected.
+  - The sandbox fixes its own memory and process ceilings, so the rule set's memory and process limits were not enforced.
+  - Runs are capped by the sandbox at 30 seconds wall time and 512 MB of memory.
+
+Scores are reproducible from the evaluation key; wall-clock timings are excluded from the report hash.

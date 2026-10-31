@@ -38,6 +38,9 @@ call is same-origin, and cookies are first-party. Nothing needs a CORS exception
    | `EXECUTION_PROVIDER` | `onlinecompiler` (default) | — |
    | `ONLINECOMPILER_COMPILER` | `gcc-15` | — |
    | `EXEC_DAILY_BUDGET` | `200`, or lower for a demo | — |
+   | `EXEC_USER_DAILY_SUBMISSIONS` | `40` (per-student ceiling) | — |
+   | `EXEC_MAX_INFLIGHT` | `4` (provider calls in flight) | — |
+   | `CRON_SECRET` | 24+ random characters — enables the queue drain | yes, for cron |
    | `INSTRUCTOR_SIGNUP_CODE` | your phrase | recommended |
    | `EXEC_SMOKE_ENABLED` | `false` | recommended |
    | `GROQ_API_KEY` | optional, for `llm_review` | no |
@@ -110,7 +113,9 @@ the API origin and add the page's origin to `EXTRA_ALLOWED_ORIGINS` on the backe
 | Grading times out at 10 s | Hobby plan function ceiling | `backend/vercel.json` already requests `maxDuration: 60`; check it is applied |
 | `503 PROVIDER_UNAVAILABLE` during a submission | onlinecompiler.io rejected the key or is rate-limiting | check `ONLINECOMPILER_API_KEY`; the response `details.provider` names the provider |
 | `/api/exec/smoke` returns 404 | `EXEC_SMOKE_ENABLED=false` in production — by design | leave it off in production; use it locally |
-| `/api/internal/drain` returns 404 | `CRON_SECRET` is empty — by design | set it and send `X-Cron-Secret` |
+| `/api/internal/drain` returns 404 | `CRON_SECRET` is empty — by design | set it and send `X-Cron-Secret` or `Authorization: Bearer` |
+| `500 INTERNAL_ERROR` on the first submit, log says `Unknown argument 'stage'` | the committed Prisma client is older than `schema.prisma` | `cd backend && npx prisma generate`, commit the regenerated client; `postinstall` now does it on every deploy |
+| Every submission stays `queued` | nothing is draining the queue: no cron, or `CRON_SECRET` missing | confirm the cron line in `vercel.json` and that `/api/internal/drain` answers 200 with the secret |
 
 ---
 
@@ -133,3 +138,80 @@ curl -s -b jar.txt https://<project>.vercel.app/api/auth/me
 Then, in the browser: register → join the course with its code → submit a `.c` file → wait for the
 report. That path exercises the origin check, the session cookies, the provider key and the
 grading coordinator in one go.
+
+---
+
+## 5. The queue in production (Day 23)
+
+A submission answers `202` and is graded off the request path. That is right for
+the student and wrong for reliability unless something picks the row up when the
+process dies. Two mechanisms do it:
+
+1. **The in-process kick.** `setImmediate(scheduleGrading)` runs immediately
+   after the response. On a long-lived server this is the normal path.
+2. **The drain.** `POST`/`GET /api/internal/drain` claims the oldest `QUEUED`
+   row with
+
+   ```sql
+   UPDATE "evaluations" ... WHERE id = (
+     SELECT id FROM "evaluations" WHERE status = 'QUEUED'
+     ORDER BY COALESCE(claimed_at, started_at)
+     LIMIT 1 FOR UPDATE SKIP LOCKED
+   ) RETURNING id;
+   ```
+
+   Postgres arbitrates the claim, so two overlapping invocations - a cron tick
+   racing a live submission, or two cron ticks racing each other - cannot grade
+   the same row twice. A `RUNNING` row whose `claimed_at` is older than 15
+   minutes is claimable again, which is how a crashed worker is recovered. After
+   three attempts the row becomes `FAILED` with `retries_exhausted: …`, so the
+   cohort view shows a failure instead of a spinner.
+
+`vercel.json` schedules it every minute. Vercel Cron authenticates with
+`Authorization: Bearer $CRON_SECRET`, which the route accepts alongside
+`X-Cron-Secret`.
+
+**Plan limits matter here.** Per-minute schedules are a Pro feature; Hobby
+deployments only get daily crons. On Hobby, either:
+
+- point an external scheduler (GitHub Actions, cron-job.org) at
+  `/api/internal/drain?limit=2` every minute with the header, or
+- accept that grading is driven by the in-process kick and that a crashed run is
+  picked up the next day.
+
+Keep the per-tick `limit` at 1-2 on Vercel: a function has 60 seconds, and two
+graded submissions is already ~16 provider calls.
+
+Check it without a browser:
+
+```bash
+curl -s -X POST https://<project>.vercel.app/api/internal/drain \
+  -H "X-Cron-Secret: $CRON_SECRET" -H 'Content-Type: application/json' \
+  -d '{"limit":1}'
+# {"data":{"claimed":1,"succeeded":1,...}}      (or claimed:0 when idle)
+
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<project>.vercel.app/api/internal/drain
+# 404  - the route does not exist without the secret
+```
+
+---
+
+## 6. Rollback
+
+The database is the only thing that cannot be rolled back by clicking a button,
+so the rule is: **migrations are written to be backward compatible for one
+release.** Adding a nullable column or a defaulted one (as
+`20261031120000_week4_queue` does) is safe for the previous build, which simply
+ignores it.
+
+To roll back:
+
+1. Vercel → Deployments → the previous deployment → **Promote to Production**.
+2. Do **not** run `prisma migrate down` — Prisma does not generate down
+   migrations for this project, and dropping `stage`/`claimed_at` would break
+   the build you just restored.
+3. If the rollback crosses a breaking migration, restore the Neon branch to the
+   pre-deploy point-in-time instead of reversing SQL by hand.
+
+Pin the last known-good deployment id in the release notes
+(`RELEASE-NOTES.md`) so "which one was working?" is a lookup, not a memory test.

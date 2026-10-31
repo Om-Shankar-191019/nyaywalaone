@@ -4,7 +4,7 @@ import express from 'express';
 import helmet from 'helmet';
 import { config } from './src/config.js';
 import { jsonShapeGuard } from './src/lib/guards.js';
-import { errorHandler, notFoundHandler } from './src/lib/http.js';
+import { errorHandler, notFoundHandler, requestId } from './src/lib/http.js';
 import { requestLogger } from './src/lib/logger.js';
 import { isAllowedOrigin, originCheck } from './src/lib/origin.js';
 import { courseAssignmentsRouter, assignmentsRouter } from './src/routes/assignments.js';
@@ -39,6 +39,8 @@ export function createApp() {
   app.use(jsonShapeGuard);
   app.use(cookieParser());
   app.use(originCheck);
+  // Before the logger, so every log line and every error body share one id.
+  app.use(requestId);
   app.use(requestLogger);
 
   app.use('/api/courses/:courseId/assignments', courseAssignmentsRouter);

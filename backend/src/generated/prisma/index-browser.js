@@ -205,7 +205,9 @@ exports.Prisma.SubmissionScalarFieldEnum = {
   filename: 'filename',
   sizeBytes: 'sizeBytes',
   releasedAt: 'releasedAt',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  signature: 'signature',
+  signatureParams: 'signatureParams'
 };
 
 exports.Prisma.EvaluationScalarFieldEnum = {
@@ -221,8 +223,11 @@ exports.Prisma.EvaluationScalarFieldEnum = {
   graderVersion: 'graderVersion',
   failedReason: 'failedReason',
   lineageOfId: 'lineageOfId',
+  stage: 'stage',
   startedAt: 'startedAt',
-  finishedAt: 'finishedAt'
+  finishedAt: 'finishedAt',
+  attemptCount: 'attemptCount',
+  claimedAt: 'claimedAt'
 };
 
 exports.Prisma.MetricResultScalarFieldEnum = {
@@ -254,6 +259,9 @@ exports.Prisma.SimilarityMatchScalarFieldEnum = {
   similarity: 'similarity',
   method: 'method',
   matchedSpan: 'matchedSpan',
+  reviewedAt: 'reviewedAt',
+  reviewedBy: 'reviewedBy',
+  reviewNote: 'reviewNote',
   createdAt: 'createdAt'
 };
 

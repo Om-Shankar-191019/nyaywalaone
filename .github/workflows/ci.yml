@@ -1,0 +1,105 @@
+name: CI
+
+# Day 22: the determinism suite is only worth having if a merge cannot skip it.
+# Unit tests run on every push; the database suite runs against a throwaway
+# Postgres; the golden corpus runs whenever grading code (or its fixtures) moved.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run test:unit
+        env:
+          NODE_ENV: test
+          # The unit suite must not reach the network or spend provider quota.
+          EXECUTION_PROVIDER: onlinecompiler
+          ONLINECOMPILER_API_KEY: ''
+          EXEC_DAILY_BUDGET: '0'
+          ACCESS_TOKEN_SECRET: ci-access-token-secret-not-a-real-secret-000
+          APP_ORIGIN: http://localhost:5173
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nyaywala_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nyaywala_ci?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/nyaywala_ci?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nyaywala_ci?schema=public
+      TEST_DIRECT_URL: postgresql://postgres:postgres@localhost:5432/nyaywala_ci?schema=public
+      ACCESS_TOKEN_SECRET: ci-access-token-secret-not-a-real-secret-000
+      APP_ORIGIN: http://localhost:5173
+      EXECUTION_PROVIDER: onlinecompiler
+      ONLINECOMPILER_API_KEY: ''
+      EXEC_DAILY_BUDGET: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run test:integration
+
+  golden:
+    name: Golden determinism
+    runs-on: ubuntu-latest
+    # Only the cells that do not need the sandbox run in CI by default: a fork's
+    # pull request has no provider key, and a suite that fails for a missing
+    # secret teaches people to ignore it. The full 270-run grid is documented in
+    # docs/reproducibility.md and run against a real key.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Report the harness is wired (no provider key in CI)
+        run: node scripts/golden.js --list

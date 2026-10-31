@@ -1,0 +1,446 @@
+{
+  "data": {
+    "json": {
+      "schema_version": "2.0",
+      "grader_version": "2.0.0",
+      "evaluation": {
+        "id": "eaa79804-cdd8-4b03-9f86-52c2658c8359",
+        "key": "49ca804294e295cddb12b342ed431164354ac4f583519ec0d3a14d9afbd65cf5",
+        "status": "SUCCEEDED",
+        "provider": "onlinecompiler",
+        "toolchain_hash": "11dba29d37cec4d36eb71016b6c97c610f162cab52033a4dfd6622d9910193df"
+      },
+      "submission": {
+        "id": "0d4667ad-e418-4790-a521-9b95cd07b693",
+        "assignment_id": "8f53238c-a1b1-409f-bde6-0f1ac6798ca9",
+        "student_id": "f2efe494-947b-45a6-aecc-122d59e25842",
+        "attempt": 11,
+        "filename": "add.c",
+        "size_bytes": 141,
+        "source_hash": "8c77b555585c6035da8edd5d0b4d63d69ae01864024dc7f8da79e02307c4270a"
+      },
+      "rule_set": {
+        "id": "3c139980-d4e6-4a7b-af60-6c86cce3c58b",
+        "version": 1,
+        "rules_hash": "6b8aec98823c90a134d1cd671b12108563ce9f992bc9cad43ec50f4eb7047b6c",
+        "problem": "add_two_integers"
+      },
+      "testset": {
+        "hash": "25fb4d74db7d28fcb28c57f9dcc5e3adf862cee3efae7b472b33ac2a634fd11d",
+        "count": 3,
+        "names": [
+          "small positives",
+          "negatives",
+          "large values"
+        ]
+      },
+      "grade": {
+        "hundredths": 8620,
+        "percent": 86.2
+      },
+      "metrics": [
+        {
+          "name": "correctness",
+          "analyzer": "io_tests",
+          "ordinal": 0,
+          "score": 1,
+          "weight": 0.2,
+          "contribution": 2000,
+          "status": "ok",
+          "feedback": "All 3 tests passed.",
+          "evidence": {
+            "failing": [],
+            "results": [
+              {
+                "name": "small positives",
+                "passed": true,
+                "status": "accepted"
+              },
+              {
+                "name": "negatives",
+                "passed": true,
+                "status": "accepted"
+              },
+              {
+                "name": "large values",
+                "passed": true,
+                "status": "accepted"
+              }
+            ],
+            "testset": "assignment",
+            "tests_total": 3,
+            "tests_passed": 3,
+            "suspected_infinite_loop": false
+          }
+        },
+        {
+          "name": "syntax",
+          "analyzer": "compiler_warnings",
+          "ordinal": 1,
+          "score": 1,
+          "weight": 0.1,
+          "contribution": 1000,
+          "status": "partial",
+          "feedback": "Compiled without errors. The sandbox uses a fixed compile line, so the -Wall -Wextra -std=c11 diagnostics requested by this rule set were not available.",
+          "evidence": {
+            "errors": 0,
+            "reason": "provider_has_no_compiler_flags",
+            "by_code": {},
+            "warnings": 0,
+            "diagnostics": [],
+            "flags_applied": null,
+            "flags_requested": "-Wall -Wextra -std=c11",
+            "warnings_as_errors": false
+          }
+        },
+        {
+          "name": "structure",
+          "analyzer": "static_analysis",
+          "ordinal": 2,
+          "score": 1,
+          "weight": 0.1,
+          "contribution": 1000,
+          "status": "ok",
+          "feedback": "Structure is within bounds: worst function has cyclomatic complexity 2 and 6 lines.",
+          "evidence": {
+            "parser": "tree-sitter-c",
+            "functions": 1,
+            "components": {
+              "nesting": 1,
+              "cyclomatic": 1,
+              "function_length": 1
+            },
+            "main_lines": 6,
+            "thresholds": {
+              "max_nesting": 4,
+              "max_cyclomatic": 8,
+              "max_function_length": 40
+            },
+            "violations": [],
+            "max_nesting": 1,
+            "total_lines": 9,
+            "cyclomatic_max": 2,
+            "longest_function": 6
+          }
+        },
+        {
+          "name": "modularity",
+          "analyzer": "function_split",
+          "ordinal": 3,
+          "score": 0.6,
+          "weight": 0.1,
+          "contribution": 600,
+          "status": "ok",
+          "feedback": "Only 1 function; the rules expect at least 2.",
+          "evidence": {
+            "helpers": 0,
+            "functions": 1,
+            "components": {
+              "main": 1,
+              "count": 0.5,
+              "helpers": 0
+            },
+            "main_lines": 6,
+            "thresholds": {
+              "min_functions": 2,
+              "expect_helpers": true,
+              "max_main_lines": 25
+            },
+            "function_list": [
+              {
+                "line": 3,
+                "name": "main",
+                "lines": 6
+              }
+            ]
+          }
+        },
+        {
+          "name": "logical",
+          "analyzer": "edge_case_runner",
+          "ordinal": 4,
+          "score": 0.714,
+          "weight": 0.1,
+          "contribution": 714,
+          "status": "ok",
+          "feedback": "2 of 7 boundary cases differ from the reference: int_overflow, int_overflow.",
+          "evidence": {
+            "oracle": "reference",
+            "crashes": 0,
+            "detected": 2,
+            "generated": [
+              {
+                "got": "0",
+                "case": "zero",
+                "note": "Zero is a boundary for division and sign handling.",
+                "input": "0 0\n",
+                "label": "zero",
+                "oracle": "reference",
+                "status": "ACCEPTED",
+                "detected": false,
+                "expected": "0"
+              },
+              {
+                "got": "-12",
+                "case": "negatives",
+                "note": "Negative operands exercise sign handling.",
+                "input": "-5 -7\n",
+                "label": "negatives-1",
+                "oracle": "reference",
+                "status": "ACCEPTED",
+                "detected": false,
+                "expected": "-12"
+              },
+              {
+                "got": "-99",
+                "case": "negatives",
+                "note": "Negative operands exercise sign handling.",
+                "input": "-100 1\n",
+                "label": "negatives-2",
+                "oracle": "reference",
+                "status": "ACCEPTED",
+                "detected": false,
+                "expected": "-99"
+              },
+              {
+                "got": "-2147483648",
+                "case": "int_overflow",
+                "note": "Signed overflow is undefined behaviour in C; the reference result is what this compiler produces.",
+                "input": "2147483647 1\n",
+                "label": "int_overflow-1",
+                "oracle": "reference",
+                "status": "ACCEPTED",
+                "detected": true,
+                "expected": "2147483648"
+              },
+              {
+                "got": "2147483647",
+                "case": "int_overflow",
+                "note": "Signed overflow is undefined behaviour in C; the reference result is what this compiler produces.",
+                "input": "-2147483648 -1\n",
+                "label": "int_overflow-2",
+                "oracle": "reference",
+                "status": "ACCEPTED",
+                "detected": true,
+                "expected": "-2147483649"
+              },
+              {
+                "got": "46",
+                "case": "whitespace",
+                "note": "Leading, trailing and repeated whitespace must not change the answer.",
+                "input": "  12\t34  \n",
+                "label": "whitespace-1",
+                "oracle": "reference",
+                "status": "ACCEPTED",
+                "detected": false,
+                "expected": "46"
+              },
+              {
+                "got": "15",
+                "case": "whitespace",
+                "note": "Leading, trailing and repeated whitespace must not change the answer.",
+                "input": "\n\n7   8\n",
+                "label": "whitespace-2",
+                "oracle": "reference",
+                "status": "ACCEPTED",
+                "detected": false,
+                "expected": "15"
+              }
+            ],
+            "cases_total": 7,
+            "no_oracle_cap": null,
+            "capped_because": null
+          }
+        },
+        {
+          "name": "complexity",
+          "analyzer": "complexity_estimator",
+          "ordinal": 5,
+          "score": 1,
+          "weight": 0.1,
+          "contribution": 1000,
+          "status": "ok",
+          "feedback": "Loops and recursion put this at O(1), within the required O(1).",
+          "evidence": {
+            "mode": "static",
+            "required": "O(1)",
+            "bands_over": 0,
+            "max_nesting": 0,
+            "order_class": "O(1)",
+            "per_function": [
+              {
+                "line": 3,
+                "name": "main",
+                "loops": 0,
+                "logLoop": false,
+                "selfCalls": 0,
+                "orderClass": "O(1)",
+                "maxLoopDepth": 0
+              }
+            ]
+          }
+        },
+        {
+          "name": "memory_safety",
+          "analyzer": "memory_audit",
+          "ordinal": 6,
+          "score": 1,
+          "weight": 0.1,
+          "contribution": 1000,
+          "status": "ok",
+          "feedback": "No memory-safety pattern was found.",
+          "evidence": {
+            "note": "Static findings are possible, not certain: a free may exist on a path the parser cannot order.",
+            "frees": 0,
+            "kinds": [],
+            "allocs": 0,
+            "findings": [],
+            "penalties": [],
+            "sanitizer": {
+              "status": "not_requested"
+            },
+            "findings_count": 0
+          }
+        },
+        {
+          "name": "readability",
+          "analyzer": "style_analysis",
+          "ordinal": 7,
+          "score": 0.4,
+          "weight": 0.1,
+          "contribution": 400,
+          "status": "ok",
+          "feedback": "Readability: 91% of identifiers are one letter; comments cover 0.0% of lines.",
+          "evidence": {
+            "lines": {
+              "total": 9,
+              "longest": 46,
+              "over_limit": 0
+            },
+            "notes": [
+              "91% of identifiers are one letter",
+              "comments cover 0.0% of lines"
+            ],
+            "comments": {
+              "lines": 0,
+              "ratio": 0
+            },
+            "components": {
+              "names": 0,
+              "comments": 0,
+              "indentation": 1,
+              "line_length": 1
+            },
+            "identifiers": {
+              "count": 11,
+              "score": 0,
+              "average_length": 1.4,
+              "single_letter_ratio": 0.909
+            },
+            "indentation": {
+              "mixed": false,
+              "tab_indented": 0,
+              "space_indented": 4
+            },
+            "trailing_whitespace_lines": 0
+          }
+        },
+        {
+          "name": "originality",
+          "analyzer": "similarity_flag",
+          "ordinal": 8,
+          "score": 0.906,
+          "weight": 0.1,
+          "contribution": 906,
+          "status": "ok",
+          "feedback": "Most similar submission: 55%. Below the 85% review threshold.",
+          "evidence": {
+            "flag": "none",
+            "note": "A flag is a reason to look, not a finding of misconduct. Identical canonical solutions also score high.",
+            "method": "minhash-128",
+            "compared": 7,
+            "threshold": 0.85,
+            "top_matches": [
+              {
+                "sample": "#\u0001ID\u0001<\u0001ID\u0001.\u0001ID\u0001>",
+                "identical": false,
+                "studentId": "2e993750-4328-4447-af7f-d0cd7697a512",
+                "similarity": 0.547,
+                "submissionId": "8c0450e9-30e8-495f-bbb7-7695a799a7bd"
+              },
+              {
+                "sample": "#\u0001ID\u0001<\u0001ID\u0001.\u0001ID\u0001>",
+                "identical": false,
+                "studentId": "2e993750-4328-4447-af7f-d0cd7697a512",
+                "similarity": 0.547,
+                "submissionId": "a766ffa3-a145-4413-a84e-09fd0ab39dcb"
+              },
+              {
+                "sample": "#\u0001ID\u0001<\u0001ID\u0001.\u0001ID\u0001>",
+                "identical": false,
+                "studentId": "2e993750-4328-4447-af7f-d0cd7697a512",
+                "similarity": 0.547,
+                "submissionId": "b02a65b0-f73e-4bae-8707-af7e17889a68"
+              }
+            ],
+            "shingle_size": 7,
+            "identical_copy": false,
+            "max_similarity": 0.547
+          }
+        },
+        {
+          "name": "readability_llm",
+          "analyzer": "llm_review",
+          "ordinal": 9,
+          "score": 0,
+          "weight": 0,
+          "contribution": 0,
+          "status": "error",
+          "feedback": "The optional review was rejected by the provider; the rest of the report is unaffected.",
+          "evidence": {
+            "model": "llama-3.3-70b-versatile",
+            "reason": "HTTP 404"
+          }
+        }
+      ],
+      "flags": {
+        "review_recommended": [
+          "syntax"
+        ],
+        "suspected_infinite_loop": false,
+        "identical_copy": false,
+        "no_oracle": false
+      },
+      "toolchain": {
+        "provider": "onlinecompiler",
+        "compiler_version": "15.3.0",
+        "stdc_version": "202311",
+        "pointer_bits": 64,
+        "fingerprint_hash": "6d712385e1049c4855064fbaa539b19f4396ce7eadf8d1c0d0ff00ab6922c859",
+        "analyzer_versions": {
+          "io_tests": "1.0.0",
+          "compiler_warnings": "1.0.0",
+          "static_analysis": "1.0.0",
+          "function_split": "1.0.0",
+          "edge_case_runner": "1.0.0",
+          "complexity_estimator": "1.0.0",
+          "memory_audit": "1.1.0",
+          "style_analysis": "1.0.0",
+          "similarity_flag": "1.0.0",
+          "llm_review": "1.0.0"
+        }
+      },
+      "usefulness": "This grade measures correctness against the assignment's tests, structure, memory discipline, readability and originality. It does not measure whether the program is a good solution to the problem, whether the student can explain it, or whether the design would survive a change in requirements.",
+      "limitations_version": "1.0",
+      "limitations": [
+        "The sandbox compiles with a fixed command line and cannot be given compiler flags, so the rule set's -Wall/-Wextra diagnostics were not available. Errors are still detected.",
+        "The sandbox fixes its own memory and process ceilings, so the rule set's memory and process limits were not enforced.",
+        "Runs are capped by the sandbox at 30 seconds wall time and 512 MB of memory."
+      ]
+    },
+    "text": "Nyaywala evaluation report\nSubmission      0d4667ad-e418-4790-a521-9b95cd07b693 (attempt 11)\nAssignment      8f53238c-a1b1-409f-bde6-0f1ac6798ca9\nRule set        v1  add_two_integers\nEvaluation key  49ca804294e295cddb12b342ed431164354ac4f583519ec0d3a14d9afbd65cf5\nGrader          2.0.0   provider onlinecompiler\nToolchain       gcc 15.3.0  (6d712385e104)\n\nGRADE           86.20 / 100\n\nMetric                 Analyzer               Score  Weight  Contrib  Status\n---------------------------------------------------------------------------\ncorrectness            io_tests                1.00    0.20     2000  ok\nsyntax                 compiler_warnings       1.00    0.10     1000  partial\nstructure              static_analysis         1.00    0.10     1000  ok\nmodularity             function_split          0.60    0.10      600  ok\nlogical                edge_case_runner        0.71    0.10      714  ok\ncomplexity             complexity_estimator    1.00    0.10     1000  ok\nmemory_safety          memory_audit            1.00    0.10     1000  ok\nreadability            style_analysis          0.40    0.10      400  ok\noriginality            similarity_flag         0.91    0.10      906  ok\nreadability_llm        llm_review              0.00    0.00        0  error\n\n- correctness: All 3 tests passed.\n- syntax: Compiled without errors. The sandbox uses a fixed compile line, so the -Wall -Wextra -std=c11 diagnostics requested by this rule set were not available.\n- structure: Structure is within bounds: worst function has cyclomatic complexity 2 and 6 lines.\n- modularity: Only 1 function; the rules expect at least 2.\n- logical: 2 of 7 boundary cases differ from the reference: int_overflow, int_overflow.\n- complexity: Loops and recursion put this at O(1), within the required O(1).\n- memory_safety: No memory-safety pattern was found.\n- readability: Readability: 91% of identifiers are one letter; comments cover 0.0% of lines.\n- originality: Most similar submission: 55%. Below the 85% review threshold.\n- readability_llm: The optional review was rejected by the provider; the rest of the report is unaffected.\n\nReview recommended: syntax\n\nUsefulness and limitations\n  This grade measures correctness against the assignment's tests, structure, memory discipline,\n  readability and originality. It does not measure whether the program is a good solution to the\n  problem, whether the student can explain it, or whether the design would survive a change in\n  requirements.\n\nLimitations\n  - The sandbox compiles with a fixed command line and cannot be given compiler flags, so the rule set's -Wall/-Wextra diagnostics were not available. Errors are still detected.\n  - The sandbox fixes its own memory and process ceilings, so the rule set's memory and process limits were not enforced.\n  - Runs are capped by the sandbox at 30 seconds wall time and 512 MB of memory.\n\nScores are reproducible from the evaluation key; wall-clock timings are excluded from the report hash.\n",
+    "hash": "53ff8c3c589d6fa787a6587b3eb6dd4495c18ed570bae80796d673ed625af43f",
+    "storedHash": "53ff8c3c589d6fa787a6587b3eb6dd4495c18ed570bae80796d673ed625af43f",
+    "verified": true
+  }
+}

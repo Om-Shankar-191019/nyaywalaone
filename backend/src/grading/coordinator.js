@@ -282,13 +282,19 @@ export async function runEvaluation(evaluationId) {
     throw error;
   }
 
-  const gate = await runCached({
-    kind: 'compile',
-    source: ctx.source,
-    sourceHash: ctx.sourceHash,
-    compilerOptions,
-    limits,
-  });
+  // An empty file never reaches the provider: the API rejects it as a bad
+  // request, which would surface as a 502 instead of the compile error it is.
+  // The corpus includes an empty submission precisely to keep this honest.
+  const emptySource = !String(ctx.source ?? '').trim();
+  const gate = emptySource
+    ? { status: { code: 'COMPILATION_ERROR', id: null, description: 'Empty source', detail: 'empty_source' }, stdout: '', stderr: '', compileOutput: '' }
+    : await runCached({
+        kind: 'compile',
+        source: ctx.source,
+        sourceHash: ctx.sourceHash,
+        compilerOptions,
+        limits,
+      });
 
   await setStage('testing');
 
@@ -363,8 +369,12 @@ export async function runEvaluation(evaluationId) {
 
   const { metrics, gradeHundredths } = scoreMetrics(results, rules.on_unavailable);
   // `partial` is a legitimate result with a caveat; only missing evidence
-  // (unavailable/error) makes the whole evaluation PARTIAL.
-  if (metrics.some((metric) => metric.status === 'unavailable' || metric.status === 'error')) partial = true;
+  // (unavailable/error) makes the whole evaluation PARTIAL. A zero-weight
+  // metric cannot, because it cannot move the grade: an unavailable advisory
+  // LLM review must not downgrade a report.
+  if (metrics.some((metric) => metric.weight > 0 && (metric.status === 'unavailable' || metric.status === 'error'))) {
+    partial = true;
+  }
 
   const similarity = metrics.find((metric) => metric.analyzer === 'similarity_flag');
   const topMatch = similarity?.evidence?.top_match;
@@ -445,7 +455,22 @@ export async function runEvaluation(evaluationId) {
  */
 const reportContent = (report) => ({
   ...report,
+  // Identity, not output. The evaluation id/key change on every regrade by
+  // design, and the submission id/attempt change on every upload - including a
+  // student re-uploading byte-identical work. Hashing them made two identical
+  // grades look different, which is exactly the drift Day 22 exists to catch.
   evaluation: { ...report.evaluation, id: undefined, key: undefined },
+  submission: { ...report.submission, id: undefined, attempt: undefined },
+  // Day 22: a zero-weight metric cannot move the grade, so its free text must
+  // not be able to move the hash either. The advisory LLM review is the reason
+  // this matters: its prose differs between two identical runs, which made a
+  // reproducible grade look unreproducible. Structure and status are hashed;
+  // the sentence is not.
+  metrics: report.metrics.map((metric) =>
+    metric.weight === 0
+      ? { name: metric.name, analyzer: metric.analyzer, ordinal: metric.ordinal, weight: 0, score: 0, contribution: 0, status: metric.status }
+      : metric,
+  ),
 });
 
 /**
@@ -454,7 +479,10 @@ const reportContent = (report) => ({
  */
 export function buildReportView({ evaluation, submission, assignment, ruleset, rules, metrics, tests, fingerprint, partial, failedReason, capabilities }) {
   const flags = {
-    review_recommended: metrics.filter((metric) => metric.status !== 'ok').map((metric) => metric.name),
+    // Advisory (zero-weight) metrics are excluded: an unavailable LLM review is
+    // not a reason to withhold a grade, and including it made the flag - and so
+    // the hash - depend on whether a third party answered.
+    review_recommended: metrics.filter((metric) => metric.weight > 0 && metric.status !== 'ok').map((metric) => metric.name),
     suspected_infinite_loop: metrics.some((metric) => metric.evidence?.suspected_infinite_loop),
     identical_copy: Boolean(metrics.find((m) => m.analyzer === 'similarity_flag')?.evidence?.identical),
     no_oracle: Boolean(metrics.find((m) => m.analyzer === 'edge_case_runner')?.evidence?.no_oracle),

@@ -5,6 +5,50 @@ import { stableStringify } from '../grading/canonical-utils.js';
 import { recordUsage } from './budget.js';
 import { DEFAULT_COMPILER_OPTIONS, resolveLimits } from './limits.js';
 import { capabilitiesOf, getProvider } from './provider.js';
+import { withProviderSlot } from './concurrency.js';
+
+/**
+ * Day 23: counters the load check and `/api/meta/usage` report. In-process, so
+ * they describe this instance rather than the whole fleet - which is what a
+ * "did the cache help?" question actually needs.
+ */
+const stats = { runs: 0, cacheHits: 0, retries: 0, failures: 0 };
+
+export const executionStats = () => ({ ...stats });
+export const resetExecutionStats = () => Object.assign(stats, { runs: 0, cacheHits: 0, retries: 0, failures: 0 });
+
+const RETRYABLE_CODES = new Set(['PROVIDER_RATE_LIMITED']);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * One run, holding a provider slot, retried when the provider says "not now".
+ * A 429 is not a grading result: without this, a burst turns into a report full
+ * of `unavailable` metrics that look like the student's fault.
+ */
+async function runWithRetry(provider, args) {
+  const capabilities = capabilitiesOf(provider.name);
+  let lastError = null;
+
+  // Five attempts, 1/2/4/8 s. The provider allows 30 runs a minute and answers
+  // 429 well before that under a burst; two retries ran out during the golden
+  // corpus and turned a rate limit into a failed evaluation. Jitter keeps three
+  // analyzers from retrying in lockstep.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      return await withProviderSlot(provider.name, capabilities.maxConcurrentRuns, () => provider.run(args));
+    } catch (error) {
+      lastError = error;
+      const retryable = RETRYABLE_CODES.has(error?.code) || error?.status === 503;
+      if (!retryable || attempt === 4) break;
+      stats.retries += 1;
+      const backoff = 1000 * 2 ** attempt + Math.floor(Math.random() * 400);
+      await sleep(backoff);
+    }
+  }
+
+  stats.failures += 1;
+  throw lastError;
+}
 
 /** The rules file speaks seconds and megabytes; the provider speaks CPU and KB. */
 export function limitsFromRules(limits = {}) {
@@ -60,11 +104,15 @@ export async function runCached({
 
   if (!bypassCache) {
     const cached = await prisma.executionCache.findUnique({ where: { cacheKey } });
-    if (cached) return { ...cached.output, cached: true };
+    if (cached) {
+      stats.cacheHits += 1;
+      return { ...cached.output, cached: true };
+    }
   }
 
   const provider = getProvider();
-  const result = await provider.run({ source, stdin, compilerOptions, limits: resolvedLimits });
+  stats.runs += 1;
+  const result = await runWithRetry(provider, { source, stdin, compilerOptions, limits: resolvedLimits });
   await recordUsage(provider.name);
 
   const output = serialise(result);

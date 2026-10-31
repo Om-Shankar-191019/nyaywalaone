@@ -202,6 +202,11 @@ model Evaluation {
   stage                String           @default("queued")
   startedAt            DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
   finishedAt           DateTime?        @map("finished_at") @db.Timestamptz(6)
+  // Day 23: how many times the queue has picked this row up, and when it was
+  // claimed. A crashed worker leaves `claimed_at` behind, which is how a stale
+  // RUNNING row is distinguished from one that is genuinely in progress.
+  attemptCount         Int              @default(0) @map("attempt_count")
+  claimedAt            DateTime?        @map("claimed_at") @db.Timestamptz(6)
 
   submission  Submission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   ruleset     RuleSet        @relation(fields: [rulesetId], references: [id], onDelete: Restrict)
@@ -210,6 +215,7 @@ model Evaluation {
   derivedFrom Evaluation[]   @relation("EvaluationLineage")
 
   @@index([submissionId])
+  @@index([status, claimedAt])
   @@map("evaluations")
 }
 

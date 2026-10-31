@@ -1,0 +1,15 @@
+{
+  "assignment": {
+    "title": "Golden corpus - sum of two integers",
+    "statement": "Read two integers and print their sum.",
+    "referenceSolution": "#include <stdio.h>\n\nint main(void) {\n    int a = 0, b = 0;\n    if (scanf(\"%d %d\", &a, &b) != 2) return 1;\n    printf(\"%d\n\", a + b);\n    return 0;\n}\n",
+    "allowLate": true,
+    "allowNoOracle": false
+  },
+  "testCases": [
+    { "name": "basic", "stdin": "2 3\n", "expectedStdout": "5\n", "ordinal": 0 },
+    { "name": "negatives", "stdin": "-7 4\n", "expectedStdout": "-3\n", "ordinal": 1 },
+    { "name": "large values", "stdin": "1000000000 1000000000\n", "expectedStdout": "2000000000\n", "ordinal": 2 }
+  ],
+  "ruleSets": ["default", "strict", "complexity"]
+}

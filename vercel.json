@@ -4,6 +4,12 @@
     "backend": { "root": "backend", "framework": "express", "entrypoint": "index.js" },
     "frontend": { "root": "frontend", "framework": "vite" }
   },
+  "crons": [
+    {
+      "path": "/api/internal/drain",
+      "schedule": "* * * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": { "service": "backend" } },
     { "source": "/(.*)", "destination": { "service": "frontend" } }

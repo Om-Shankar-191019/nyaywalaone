@@ -215,6 +215,8 @@ export function createOnlineCompilerProvider() {
       perRunTimeLimit: true,
       maxTimeLimitSeconds: 30,
       synchronous: true,
+      // The API accepts two concurrent runs and answers 429 beyond that.
+      maxConcurrentRuns: 2,
     }),
 
     async run({ source, stdin = '', limits }) {

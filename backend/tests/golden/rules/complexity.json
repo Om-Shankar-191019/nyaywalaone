@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "problem": "sum_two_integers_complexity",
+  "limits": { "time_limit_s": 2, "memory_limit_mb": 64, "max_processes": 30 },
+  "on_unavailable": "renormalize",
+  "metrics": [
+    { "name": "correctness", "analyzer": "io_tests", "weight": 0.25, "params": { "testset": "assignment", "partial_credit": true } },
+    { "name": "complexity", "analyzer": "complexity_estimator", "weight": 0.35, "params": { "required": "O(1)", "sizes": [1, 10, 100, 1000], "mode": "static", "timing_evidence": true } },
+    { "name": "structure", "analyzer": "static_analysis", "weight": 0.15, "params": { "max_cyclomatic": 10, "max_function_length": 40, "max_nesting": 5, "scoring": "linear", "min_score": 0 } },
+    { "name": "logical", "analyzer": "edge_case_runner", "weight": 0.1, "params": { "cases": ["zero", "negatives", "int_overflow"], "no_oracle_cap": 0.5 } },
+    { "name": "memory_safety", "analyzer": "memory_audit", "weight": 0.05, "params": { "check_leaks": true, "check_unchecked_alloc": true, "banned_functions": ["gets"], "sanitizer_run": false } },
+    { "name": "syntax", "analyzer": "compiler_warnings", "weight": 0.05, "params": { "flags": "-Wall -std=c11", "warnings_as_errors": false, "penalty_per_warning": 0.1 } },
+    { "name": "modularity", "analyzer": "function_split", "weight": 0.05, "params": { "min_functions": 2, "expect_helpers": true, "max_main_lines": 30 } }
+  ]
+}

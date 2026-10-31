@@ -43,6 +43,7 @@ export function capabilitiesOf(name = config.EXECUTION_PROVIDER) {
       perRunTimeLimit: true,
       maxTimeLimitSeconds: 20,
       synchronous: false,
+      maxConcurrentRuns: 4,
     }
   );
 }

@@ -10830,6 +10830,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt: number
     createdAt: number
+    signature: number
+    signatureParams: number
     _all: number
   }
 
@@ -10881,6 +10883,8 @@ export namespace Prisma {
     sizeBytes?: true
     releasedAt?: true
     createdAt?: true
+    signature?: true
+    signatureParams?: true
     _all?: true
   }
 
@@ -10981,6 +10985,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt: Date | null
     createdAt: Date
+    signature: JsonValue | null
+    signatureParams: JsonValue | null
     _count: SubmissionCountAggregateOutputType | null
     _avg: SubmissionAvgAggregateOutputType | null
     _sum: SubmissionSumAggregateOutputType | null
@@ -11013,6 +11019,8 @@ export namespace Prisma {
     sizeBytes?: boolean
     releasedAt?: boolean
     createdAt?: boolean
+    signature?: boolean
+    signatureParams?: boolean
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
     student?: boolean | UserDefaultArgs<ExtArgs>
     evaluations?: boolean | Submission$evaluationsArgs<ExtArgs>
@@ -11030,6 +11038,8 @@ export namespace Prisma {
     sizeBytes?: boolean
     releasedAt?: boolean
     createdAt?: boolean
+    signature?: boolean
+    signatureParams?: boolean
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
     student?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["submission"]>
@@ -11045,6 +11055,8 @@ export namespace Prisma {
     sizeBytes?: boolean
     releasedAt?: boolean
     createdAt?: boolean
+    signature?: boolean
+    signatureParams?: boolean
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
     student?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["submission"]>
@@ -11060,9 +11072,11 @@ export namespace Prisma {
     sizeBytes?: boolean
     releasedAt?: boolean
     createdAt?: boolean
+    signature?: boolean
+    signatureParams?: boolean
   }
 
-  export type SubmissionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "assignmentId" | "studentId" | "attempt" | "source" | "sourceHash" | "filename" | "sizeBytes" | "releasedAt" | "createdAt", ExtArgs["result"]["submission"]>
+  export type SubmissionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "assignmentId" | "studentId" | "attempt" | "source" | "sourceHash" | "filename" | "sizeBytes" | "releasedAt" | "createdAt" | "signature" | "signatureParams", ExtArgs["result"]["submission"]>
   export type SubmissionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
     student?: boolean | UserDefaultArgs<ExtArgs>
@@ -11096,6 +11110,8 @@ export namespace Prisma {
       sizeBytes: number
       releasedAt: Date | null
       createdAt: Date
+      signature: Prisma.JsonValue | null
+      signatureParams: Prisma.JsonValue | null
     }, ExtArgs["result"]["submission"]>
     composites: {}
   }
@@ -11532,6 +11548,8 @@ export namespace Prisma {
     readonly sizeBytes: FieldRef<"Submission", 'Int'>
     readonly releasedAt: FieldRef<"Submission", 'DateTime'>
     readonly createdAt: FieldRef<"Submission", 'DateTime'>
+    readonly signature: FieldRef<"Submission", 'Json'>
+    readonly signatureParams: FieldRef<"Submission", 'Json'>
   }
     
 
@@ -11989,10 +12007,12 @@ export namespace Prisma {
 
   export type EvaluationAvgAggregateOutputType = {
     gradeHundredths: number | null
+    attemptCount: number | null
   }
 
   export type EvaluationSumAggregateOutputType = {
     gradeHundredths: number | null
+    attemptCount: number | null
   }
 
   export type EvaluationMinAggregateOutputType = {
@@ -12008,8 +12028,11 @@ export namespace Prisma {
     graderVersion: string | null
     failedReason: string | null
     lineageOfId: string | null
+    stage: string | null
     startedAt: Date | null
     finishedAt: Date | null
+    attemptCount: number | null
+    claimedAt: Date | null
   }
 
   export type EvaluationMaxAggregateOutputType = {
@@ -12025,8 +12048,11 @@ export namespace Prisma {
     graderVersion: string | null
     failedReason: string | null
     lineageOfId: string | null
+    stage: string | null
     startedAt: Date | null
     finishedAt: Date | null
+    attemptCount: number | null
+    claimedAt: Date | null
   }
 
   export type EvaluationCountAggregateOutputType = {
@@ -12042,18 +12068,23 @@ export namespace Prisma {
     graderVersion: number
     failedReason: number
     lineageOfId: number
+    stage: number
     startedAt: number
     finishedAt: number
+    attemptCount: number
+    claimedAt: number
     _all: number
   }
 
 
   export type EvaluationAvgAggregateInputType = {
     gradeHundredths?: true
+    attemptCount?: true
   }
 
   export type EvaluationSumAggregateInputType = {
     gradeHundredths?: true
+    attemptCount?: true
   }
 
   export type EvaluationMinAggregateInputType = {
@@ -12069,8 +12100,11 @@ export namespace Prisma {
     graderVersion?: true
     failedReason?: true
     lineageOfId?: true
+    stage?: true
     startedAt?: true
     finishedAt?: true
+    attemptCount?: true
+    claimedAt?: true
   }
 
   export type EvaluationMaxAggregateInputType = {
@@ -12086,8 +12120,11 @@ export namespace Prisma {
     graderVersion?: true
     failedReason?: true
     lineageOfId?: true
+    stage?: true
     startedAt?: true
     finishedAt?: true
+    attemptCount?: true
+    claimedAt?: true
   }
 
   export type EvaluationCountAggregateInputType = {
@@ -12103,8 +12140,11 @@ export namespace Prisma {
     graderVersion?: true
     failedReason?: true
     lineageOfId?: true
+    stage?: true
     startedAt?: true
     finishedAt?: true
+    attemptCount?: true
+    claimedAt?: true
     _all?: true
   }
 
@@ -12207,8 +12247,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason: string | null
     lineageOfId: string | null
+    stage: string
     startedAt: Date
     finishedAt: Date | null
+    attemptCount: number
+    claimedAt: Date | null
     _count: EvaluationCountAggregateOutputType | null
     _avg: EvaluationAvgAggregateOutputType | null
     _sum: EvaluationSumAggregateOutputType | null
@@ -12243,8 +12286,11 @@ export namespace Prisma {
     graderVersion?: boolean
     failedReason?: boolean
     lineageOfId?: boolean
+    stage?: boolean
     startedAt?: boolean
     finishedAt?: boolean
+    attemptCount?: boolean
+    claimedAt?: boolean
     submission?: boolean | SubmissionDefaultArgs<ExtArgs>
     ruleset?: boolean | RuleSetDefaultArgs<ExtArgs>
     metrics?: boolean | Evaluation$metricsArgs<ExtArgs>
@@ -12266,8 +12312,11 @@ export namespace Prisma {
     graderVersion?: boolean
     failedReason?: boolean
     lineageOfId?: boolean
+    stage?: boolean
     startedAt?: boolean
     finishedAt?: boolean
+    attemptCount?: boolean
+    claimedAt?: boolean
     submission?: boolean | SubmissionDefaultArgs<ExtArgs>
     ruleset?: boolean | RuleSetDefaultArgs<ExtArgs>
     lineageOf?: boolean | Evaluation$lineageOfArgs<ExtArgs>
@@ -12286,8 +12335,11 @@ export namespace Prisma {
     graderVersion?: boolean
     failedReason?: boolean
     lineageOfId?: boolean
+    stage?: boolean
     startedAt?: boolean
     finishedAt?: boolean
+    attemptCount?: boolean
+    claimedAt?: boolean
     submission?: boolean | SubmissionDefaultArgs<ExtArgs>
     ruleset?: boolean | RuleSetDefaultArgs<ExtArgs>
     lineageOf?: boolean | Evaluation$lineageOfArgs<ExtArgs>
@@ -12306,11 +12358,14 @@ export namespace Prisma {
     graderVersion?: boolean
     failedReason?: boolean
     lineageOfId?: boolean
+    stage?: boolean
     startedAt?: boolean
     finishedAt?: boolean
+    attemptCount?: boolean
+    claimedAt?: boolean
   }
 
-  export type EvaluationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "submissionId" | "rulesetId" | "evaluationKey" | "status" | "gradeHundredths" | "reportHash" | "provider" | "toolchainFingerprint" | "graderVersion" | "failedReason" | "lineageOfId" | "startedAt" | "finishedAt", ExtArgs["result"]["evaluation"]>
+  export type EvaluationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "submissionId" | "rulesetId" | "evaluationKey" | "status" | "gradeHundredths" | "reportHash" | "provider" | "toolchainFingerprint" | "graderVersion" | "failedReason" | "lineageOfId" | "stage" | "startedAt" | "finishedAt" | "attemptCount" | "claimedAt", ExtArgs["result"]["evaluation"]>
   export type EvaluationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     submission?: boolean | SubmissionDefaultArgs<ExtArgs>
     ruleset?: boolean | RuleSetDefaultArgs<ExtArgs>
@@ -12352,8 +12407,11 @@ export namespace Prisma {
       graderVersion: string
       failedReason: string | null
       lineageOfId: string | null
+      stage: string
       startedAt: Date
       finishedAt: Date | null
+      attemptCount: number
+      claimedAt: Date | null
     }, ExtArgs["result"]["evaluation"]>
     composites: {}
   }
@@ -12794,8 +12852,11 @@ export namespace Prisma {
     readonly graderVersion: FieldRef<"Evaluation", 'String'>
     readonly failedReason: FieldRef<"Evaluation", 'String'>
     readonly lineageOfId: FieldRef<"Evaluation", 'String'>
+    readonly stage: FieldRef<"Evaluation", 'String'>
     readonly startedAt: FieldRef<"Evaluation", 'DateTime'>
     readonly finishedAt: FieldRef<"Evaluation", 'DateTime'>
+    readonly attemptCount: FieldRef<"Evaluation", 'Int'>
+    readonly claimedAt: FieldRef<"Evaluation", 'DateTime'>
   }
     
 
@@ -15475,6 +15536,9 @@ export namespace Prisma {
     submissionB: string | null
     similarity: number | null
     method: string | null
+    reviewedAt: Date | null
+    reviewedBy: string | null
+    reviewNote: string | null
     createdAt: Date | null
   }
 
@@ -15485,6 +15549,9 @@ export namespace Prisma {
     submissionB: string | null
     similarity: number | null
     method: string | null
+    reviewedAt: Date | null
+    reviewedBy: string | null
+    reviewNote: string | null
     createdAt: Date | null
   }
 
@@ -15496,6 +15563,9 @@ export namespace Prisma {
     similarity: number
     method: number
     matchedSpan: number
+    reviewedAt: number
+    reviewedBy: number
+    reviewNote: number
     createdAt: number
     _all: number
   }
@@ -15516,6 +15586,9 @@ export namespace Prisma {
     submissionB?: true
     similarity?: true
     method?: true
+    reviewedAt?: true
+    reviewedBy?: true
+    reviewNote?: true
     createdAt?: true
   }
 
@@ -15526,6 +15599,9 @@ export namespace Prisma {
     submissionB?: true
     similarity?: true
     method?: true
+    reviewedAt?: true
+    reviewedBy?: true
+    reviewNote?: true
     createdAt?: true
   }
 
@@ -15537,6 +15613,9 @@ export namespace Prisma {
     similarity?: true
     method?: true
     matchedSpan?: true
+    reviewedAt?: true
+    reviewedBy?: true
+    reviewNote?: true
     createdAt?: true
     _all?: true
   }
@@ -15635,6 +15714,9 @@ export namespace Prisma {
     similarity: number
     method: string
     matchedSpan: JsonValue | null
+    reviewedAt: Date | null
+    reviewedBy: string | null
+    reviewNote: string | null
     createdAt: Date
     _count: SimilarityMatchCountAggregateOutputType | null
     _avg: SimilarityMatchAvgAggregateOutputType | null
@@ -15665,6 +15747,9 @@ export namespace Prisma {
     similarity?: boolean
     method?: boolean
     matchedSpan?: boolean
+    reviewedAt?: boolean
+    reviewedBy?: boolean
+    reviewNote?: boolean
     createdAt?: boolean
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["similarityMatch"]>
@@ -15677,6 +15762,9 @@ export namespace Prisma {
     similarity?: boolean
     method?: boolean
     matchedSpan?: boolean
+    reviewedAt?: boolean
+    reviewedBy?: boolean
+    reviewNote?: boolean
     createdAt?: boolean
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["similarityMatch"]>
@@ -15689,6 +15777,9 @@ export namespace Prisma {
     similarity?: boolean
     method?: boolean
     matchedSpan?: boolean
+    reviewedAt?: boolean
+    reviewedBy?: boolean
+    reviewNote?: boolean
     createdAt?: boolean
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["similarityMatch"]>
@@ -15701,10 +15792,13 @@ export namespace Prisma {
     similarity?: boolean
     method?: boolean
     matchedSpan?: boolean
+    reviewedAt?: boolean
+    reviewedBy?: boolean
+    reviewNote?: boolean
     createdAt?: boolean
   }
 
-  export type SimilarityMatchOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "assignmentId" | "submissionA" | "submissionB" | "similarity" | "method" | "matchedSpan" | "createdAt", ExtArgs["result"]["similarityMatch"]>
+  export type SimilarityMatchOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "assignmentId" | "submissionA" | "submissionB" | "similarity" | "method" | "matchedSpan" | "reviewedAt" | "reviewedBy" | "reviewNote" | "createdAt", ExtArgs["result"]["similarityMatch"]>
   export type SimilarityMatchInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     assignment?: boolean | AssignmentDefaultArgs<ExtArgs>
   }
@@ -15728,6 +15822,9 @@ export namespace Prisma {
       similarity: number
       method: string
       matchedSpan: Prisma.JsonValue | null
+      reviewedAt: Date | null
+      reviewedBy: string | null
+      reviewNote: string | null
       createdAt: Date
     }, ExtArgs["result"]["similarityMatch"]>
     composites: {}
@@ -16160,6 +16257,9 @@ export namespace Prisma {
     readonly similarity: FieldRef<"SimilarityMatch", 'Float'>
     readonly method: FieldRef<"SimilarityMatch", 'String'>
     readonly matchedSpan: FieldRef<"SimilarityMatch", 'Json'>
+    readonly reviewedAt: FieldRef<"SimilarityMatch", 'DateTime'>
+    readonly reviewedBy: FieldRef<"SimilarityMatch", 'String'>
+    readonly reviewNote: FieldRef<"SimilarityMatch", 'String'>
     readonly createdAt: FieldRef<"SimilarityMatch", 'DateTime'>
   }
     
@@ -20907,7 +21007,9 @@ export namespace Prisma {
     filename: 'filename',
     sizeBytes: 'sizeBytes',
     releasedAt: 'releasedAt',
-    createdAt: 'createdAt'
+    createdAt: 'createdAt',
+    signature: 'signature',
+    signatureParams: 'signatureParams'
   };
 
   export type SubmissionScalarFieldEnum = (typeof SubmissionScalarFieldEnum)[keyof typeof SubmissionScalarFieldEnum]
@@ -20926,8 +21028,11 @@ export namespace Prisma {
     graderVersion: 'graderVersion',
     failedReason: 'failedReason',
     lineageOfId: 'lineageOfId',
+    stage: 'stage',
     startedAt: 'startedAt',
-    finishedAt: 'finishedAt'
+    finishedAt: 'finishedAt',
+    attemptCount: 'attemptCount',
+    claimedAt: 'claimedAt'
   };
 
   export type EvaluationScalarFieldEnum = (typeof EvaluationScalarFieldEnum)[keyof typeof EvaluationScalarFieldEnum]
@@ -20968,6 +21073,9 @@ export namespace Prisma {
     similarity: 'similarity',
     method: 'method',
     matchedSpan: 'matchedSpan',
+    reviewedAt: 'reviewedAt',
+    reviewedBy: 'reviewedBy',
+    reviewNote: 'reviewNote',
     createdAt: 'createdAt'
   };
 
@@ -21733,6 +21841,8 @@ export namespace Prisma {
     sizeBytes?: IntFilter<"Submission"> | number
     releasedAt?: DateTimeNullableFilter<"Submission"> | Date | string | null
     createdAt?: DateTimeFilter<"Submission"> | Date | string
+    signature?: JsonNullableFilter<"Submission">
+    signatureParams?: JsonNullableFilter<"Submission">
     assignment?: XOR<AssignmentScalarRelationFilter, AssignmentWhereInput>
     student?: XOR<UserScalarRelationFilter, UserWhereInput>
     evaluations?: EvaluationListRelationFilter
@@ -21749,6 +21859,8 @@ export namespace Prisma {
     sizeBytes?: SortOrder
     releasedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
+    signature?: SortOrderInput | SortOrder
+    signatureParams?: SortOrderInput | SortOrder
     assignment?: AssignmentOrderByWithRelationInput
     student?: UserOrderByWithRelationInput
     evaluations?: EvaluationOrderByRelationAggregateInput
@@ -21769,6 +21881,8 @@ export namespace Prisma {
     sizeBytes?: IntFilter<"Submission"> | number
     releasedAt?: DateTimeNullableFilter<"Submission"> | Date | string | null
     createdAt?: DateTimeFilter<"Submission"> | Date | string
+    signature?: JsonNullableFilter<"Submission">
+    signatureParams?: JsonNullableFilter<"Submission">
     assignment?: XOR<AssignmentScalarRelationFilter, AssignmentWhereInput>
     student?: XOR<UserScalarRelationFilter, UserWhereInput>
     evaluations?: EvaluationListRelationFilter
@@ -21785,6 +21899,8 @@ export namespace Prisma {
     sizeBytes?: SortOrder
     releasedAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
+    signature?: SortOrderInput | SortOrder
+    signatureParams?: SortOrderInput | SortOrder
     _count?: SubmissionCountOrderByAggregateInput
     _avg?: SubmissionAvgOrderByAggregateInput
     _max?: SubmissionMaxOrderByAggregateInput
@@ -21806,6 +21922,8 @@ export namespace Prisma {
     sizeBytes?: IntWithAggregatesFilter<"Submission"> | number
     releasedAt?: DateTimeNullableWithAggregatesFilter<"Submission"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Submission"> | Date | string
+    signature?: JsonNullableWithAggregatesFilter<"Submission">
+    signatureParams?: JsonNullableWithAggregatesFilter<"Submission">
   }
 
   export type EvaluationWhereInput = {
@@ -21824,8 +21942,11 @@ export namespace Prisma {
     graderVersion?: StringFilter<"Evaluation"> | string
     failedReason?: StringNullableFilter<"Evaluation"> | string | null
     lineageOfId?: UuidNullableFilter<"Evaluation"> | string | null
+    stage?: StringFilter<"Evaluation"> | string
     startedAt?: DateTimeFilter<"Evaluation"> | Date | string
     finishedAt?: DateTimeNullableFilter<"Evaluation"> | Date | string | null
+    attemptCount?: IntFilter<"Evaluation"> | number
+    claimedAt?: DateTimeNullableFilter<"Evaluation"> | Date | string | null
     submission?: XOR<SubmissionScalarRelationFilter, SubmissionWhereInput>
     ruleset?: XOR<RuleSetScalarRelationFilter, RuleSetWhereInput>
     metrics?: MetricResultListRelationFilter
@@ -21846,8 +21967,11 @@ export namespace Prisma {
     graderVersion?: SortOrder
     failedReason?: SortOrderInput | SortOrder
     lineageOfId?: SortOrderInput | SortOrder
+    stage?: SortOrder
     startedAt?: SortOrder
     finishedAt?: SortOrderInput | SortOrder
+    attemptCount?: SortOrder
+    claimedAt?: SortOrderInput | SortOrder
     submission?: SubmissionOrderByWithRelationInput
     ruleset?: RuleSetOrderByWithRelationInput
     metrics?: MetricResultOrderByRelationAggregateInput
@@ -21871,8 +21995,11 @@ export namespace Prisma {
     graderVersion?: StringFilter<"Evaluation"> | string
     failedReason?: StringNullableFilter<"Evaluation"> | string | null
     lineageOfId?: UuidNullableFilter<"Evaluation"> | string | null
+    stage?: StringFilter<"Evaluation"> | string
     startedAt?: DateTimeFilter<"Evaluation"> | Date | string
     finishedAt?: DateTimeNullableFilter<"Evaluation"> | Date | string | null
+    attemptCount?: IntFilter<"Evaluation"> | number
+    claimedAt?: DateTimeNullableFilter<"Evaluation"> | Date | string | null
     submission?: XOR<SubmissionScalarRelationFilter, SubmissionWhereInput>
     ruleset?: XOR<RuleSetScalarRelationFilter, RuleSetWhereInput>
     metrics?: MetricResultListRelationFilter
@@ -21893,8 +22020,11 @@ export namespace Prisma {
     graderVersion?: SortOrder
     failedReason?: SortOrderInput | SortOrder
     lineageOfId?: SortOrderInput | SortOrder
+    stage?: SortOrder
     startedAt?: SortOrder
     finishedAt?: SortOrderInput | SortOrder
+    attemptCount?: SortOrder
+    claimedAt?: SortOrderInput | SortOrder
     _count?: EvaluationCountOrderByAggregateInput
     _avg?: EvaluationAvgOrderByAggregateInput
     _max?: EvaluationMaxOrderByAggregateInput
@@ -21918,8 +22048,11 @@ export namespace Prisma {
     graderVersion?: StringWithAggregatesFilter<"Evaluation"> | string
     failedReason?: StringNullableWithAggregatesFilter<"Evaluation"> | string | null
     lineageOfId?: UuidNullableWithAggregatesFilter<"Evaluation"> | string | null
+    stage?: StringWithAggregatesFilter<"Evaluation"> | string
     startedAt?: DateTimeWithAggregatesFilter<"Evaluation"> | Date | string
     finishedAt?: DateTimeNullableWithAggregatesFilter<"Evaluation"> | Date | string | null
+    attemptCount?: IntWithAggregatesFilter<"Evaluation"> | number
+    claimedAt?: DateTimeNullableWithAggregatesFilter<"Evaluation"> | Date | string | null
   }
 
   export type MetricResultWhereInput = {
@@ -22068,6 +22201,9 @@ export namespace Prisma {
     similarity?: FloatFilter<"SimilarityMatch"> | number
     method?: StringFilter<"SimilarityMatch"> | string
     matchedSpan?: JsonNullableFilter<"SimilarityMatch">
+    reviewedAt?: DateTimeNullableFilter<"SimilarityMatch"> | Date | string | null
+    reviewedBy?: UuidNullableFilter<"SimilarityMatch"> | string | null
+    reviewNote?: StringNullableFilter<"SimilarityMatch"> | string | null
     createdAt?: DateTimeFilter<"SimilarityMatch"> | Date | string
     assignment?: XOR<AssignmentScalarRelationFilter, AssignmentWhereInput>
   }
@@ -22080,6 +22216,9 @@ export namespace Prisma {
     similarity?: SortOrder
     method?: SortOrder
     matchedSpan?: SortOrderInput | SortOrder
+    reviewedAt?: SortOrderInput | SortOrder
+    reviewedBy?: SortOrderInput | SortOrder
+    reviewNote?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     assignment?: AssignmentOrderByWithRelationInput
   }
@@ -22096,6 +22235,9 @@ export namespace Prisma {
     similarity?: FloatFilter<"SimilarityMatch"> | number
     method?: StringFilter<"SimilarityMatch"> | string
     matchedSpan?: JsonNullableFilter<"SimilarityMatch">
+    reviewedAt?: DateTimeNullableFilter<"SimilarityMatch"> | Date | string | null
+    reviewedBy?: UuidNullableFilter<"SimilarityMatch"> | string | null
+    reviewNote?: StringNullableFilter<"SimilarityMatch"> | string | null
     createdAt?: DateTimeFilter<"SimilarityMatch"> | Date | string
     assignment?: XOR<AssignmentScalarRelationFilter, AssignmentWhereInput>
   }, "id" | "submissionA_submissionB_method">
@@ -22108,6 +22250,9 @@ export namespace Prisma {
     similarity?: SortOrder
     method?: SortOrder
     matchedSpan?: SortOrderInput | SortOrder
+    reviewedAt?: SortOrderInput | SortOrder
+    reviewedBy?: SortOrderInput | SortOrder
+    reviewNote?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     _count?: SimilarityMatchCountOrderByAggregateInput
     _avg?: SimilarityMatchAvgOrderByAggregateInput
@@ -22127,6 +22272,9 @@ export namespace Prisma {
     similarity?: FloatWithAggregatesFilter<"SimilarityMatch"> | number
     method?: StringWithAggregatesFilter<"SimilarityMatch"> | string
     matchedSpan?: JsonNullableWithAggregatesFilter<"SimilarityMatch">
+    reviewedAt?: DateTimeNullableWithAggregatesFilter<"SimilarityMatch"> | Date | string | null
+    reviewedBy?: UuidNullableWithAggregatesFilter<"SimilarityMatch"> | string | null
+    reviewNote?: StringNullableWithAggregatesFilter<"SimilarityMatch"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"SimilarityMatch"> | Date | string
   }
 
@@ -22952,6 +23100,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     assignment: AssignmentCreateNestedOneWithoutSubmissionsInput
     student: UserCreateNestedOneWithoutSubmissionsInput
     evaluations?: EvaluationCreateNestedManyWithoutSubmissionInput
@@ -22968,6 +23118,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     evaluations?: EvaluationUncheckedCreateNestedManyWithoutSubmissionInput
   }
 
@@ -22980,6 +23132,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     assignment?: AssignmentUpdateOneRequiredWithoutSubmissionsNestedInput
     student?: UserUpdateOneRequiredWithoutSubmissionsNestedInput
     evaluations?: EvaluationUpdateManyWithoutSubmissionNestedInput
@@ -22996,6 +23150,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     evaluations?: EvaluationUncheckedUpdateManyWithoutSubmissionNestedInput
   }
 
@@ -23010,6 +23166,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SubmissionUpdateManyMutationInput = {
@@ -23021,6 +23179,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SubmissionUncheckedUpdateManyInput = {
@@ -23034,6 +23194,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type EvaluationCreateInput = {
@@ -23046,8 +23208,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     submission: SubmissionCreateNestedOneWithoutEvaluationsInput
     ruleset: RuleSetCreateNestedOneWithoutEvaluationsInput
     metrics?: MetricResultCreateNestedManyWithoutEvaluationInput
@@ -23068,8 +23233,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     metrics?: MetricResultUncheckedCreateNestedManyWithoutEvaluationInput
     derivedFrom?: EvaluationUncheckedCreateNestedManyWithoutLineageOfInput
   }
@@ -23084,8 +23252,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     submission?: SubmissionUpdateOneRequiredWithoutEvaluationsNestedInput
     ruleset?: RuleSetUpdateOneRequiredWithoutEvaluationsNestedInput
     metrics?: MetricResultUpdateManyWithoutEvaluationNestedInput
@@ -23106,8 +23277,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     metrics?: MetricResultUncheckedUpdateManyWithoutEvaluationNestedInput
     derivedFrom?: EvaluationUncheckedUpdateManyWithoutLineageOfNestedInput
   }
@@ -23125,8 +23299,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
   }
 
   export type EvaluationUpdateManyMutationInput = {
@@ -23139,8 +23316,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type EvaluationUncheckedUpdateManyInput = {
@@ -23156,8 +23336,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type MetricResultCreateInput = {
@@ -23313,6 +23496,9 @@ export namespace Prisma {
     similarity: number
     method?: string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: Date | string | null
+    reviewedBy?: string | null
+    reviewNote?: string | null
     createdAt?: Date | string
     assignment: AssignmentCreateNestedOneWithoutSimilarityInput
   }
@@ -23325,6 +23511,9 @@ export namespace Prisma {
     similarity: number
     method?: string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: Date | string | null
+    reviewedBy?: string | null
+    reviewNote?: string | null
     createdAt?: Date | string
   }
 
@@ -23335,6 +23524,9 @@ export namespace Prisma {
     similarity?: FloatFieldUpdateOperationsInput | number
     method?: StringFieldUpdateOperationsInput | string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reviewedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     assignment?: AssignmentUpdateOneRequiredWithoutSimilarityNestedInput
   }
@@ -23347,6 +23539,9 @@ export namespace Prisma {
     similarity?: FloatFieldUpdateOperationsInput | number
     method?: StringFieldUpdateOperationsInput | string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reviewedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -23358,6 +23553,9 @@ export namespace Prisma {
     similarity: number
     method?: string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: Date | string | null
+    reviewedBy?: string | null
+    reviewNote?: string | null
     createdAt?: Date | string
   }
 
@@ -23368,6 +23566,9 @@ export namespace Prisma {
     similarity?: FloatFieldUpdateOperationsInput | number
     method?: StringFieldUpdateOperationsInput | string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reviewedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -23379,6 +23580,9 @@ export namespace Prisma {
     similarity?: FloatFieldUpdateOperationsInput | number
     method?: StringFieldUpdateOperationsInput | string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reviewedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -24299,6 +24503,29 @@ export namespace Prisma {
   export type TestCaseSumOrderByAggregateInput = {
     ordinal?: SortOrder
   }
+  export type JsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type SubmissionAssignmentIdStudentIdAttemptCompoundUniqueInput = {
     assignmentId: string
@@ -24317,6 +24544,8 @@ export namespace Prisma {
     sizeBytes?: SortOrder
     releasedAt?: SortOrder
     createdAt?: SortOrder
+    signature?: SortOrder
+    signatureParams?: SortOrder
   }
 
   export type SubmissionAvgOrderByAggregateInput = {
@@ -24353,6 +24582,32 @@ export namespace Prisma {
   export type SubmissionSumOrderByAggregateInput = {
     attempt?: SortOrder
     sizeBytes?: SortOrder
+  }
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type EnumEvaluationStatusFilter<$PrismaModel = never> = {
@@ -24411,12 +24666,16 @@ export namespace Prisma {
     graderVersion?: SortOrder
     failedReason?: SortOrder
     lineageOfId?: SortOrder
+    stage?: SortOrder
     startedAt?: SortOrder
     finishedAt?: SortOrder
+    attemptCount?: SortOrder
+    claimedAt?: SortOrder
   }
 
   export type EvaluationAvgOrderByAggregateInput = {
     gradeHundredths?: SortOrder
+    attemptCount?: SortOrder
   }
 
   export type EvaluationMaxOrderByAggregateInput = {
@@ -24432,8 +24691,11 @@ export namespace Prisma {
     graderVersion?: SortOrder
     failedReason?: SortOrder
     lineageOfId?: SortOrder
+    stage?: SortOrder
     startedAt?: SortOrder
     finishedAt?: SortOrder
+    attemptCount?: SortOrder
+    claimedAt?: SortOrder
   }
 
   export type EvaluationMinOrderByAggregateInput = {
@@ -24449,12 +24711,16 @@ export namespace Prisma {
     graderVersion?: SortOrder
     failedReason?: SortOrder
     lineageOfId?: SortOrder
+    stage?: SortOrder
     startedAt?: SortOrder
     finishedAt?: SortOrder
+    attemptCount?: SortOrder
+    claimedAt?: SortOrder
   }
 
   export type EvaluationSumOrderByAggregateInput = {
     gradeHundredths?: SortOrder
+    attemptCount?: SortOrder
   }
 
   export type EnumEvaluationStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -24592,29 +24858,6 @@ export namespace Prisma {
     kind?: SortOrder
     createdAt?: SortOrder
   }
-  export type JsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
 
   export type SimilarityMatchSubmissionASubmissionBMethodCompoundUniqueInput = {
     submissionA: string
@@ -24630,6 +24873,9 @@ export namespace Prisma {
     similarity?: SortOrder
     method?: SortOrder
     matchedSpan?: SortOrder
+    reviewedAt?: SortOrder
+    reviewedBy?: SortOrder
+    reviewNote?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -24644,6 +24890,9 @@ export namespace Prisma {
     submissionB?: SortOrder
     similarity?: SortOrder
     method?: SortOrder
+    reviewedAt?: SortOrder
+    reviewedBy?: SortOrder
+    reviewNote?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -24654,37 +24903,14 @@ export namespace Prisma {
     submissionB?: SortOrder
     similarity?: SortOrder
     method?: SortOrder
+    reviewedAt?: SortOrder
+    reviewedBy?: SortOrder
+    reviewNote?: SortOrder
     createdAt?: SortOrder
   }
 
   export type SimilarityMatchSumOrderByAggregateInput = {
     similarity?: SortOrder
-  }
-  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedJsonNullableFilter<$PrismaModel>
-    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type LlmCacheCountOrderByAggregateInput = {
@@ -26090,6 +26316,29 @@ export namespace Prisma {
     gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
+  export type NestedJsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type NestedEnumEvaluationStatusFilter<$PrismaModel = never> = {
     equals?: $Enums.EvaluationStatus | EnumEvaluationStatusFieldRefInput<$PrismaModel>
@@ -26149,29 +26398,6 @@ export namespace Prisma {
     _sum?: NestedFloatFilter<$PrismaModel>
     _min?: NestedFloatFilter<$PrismaModel>
     _max?: NestedFloatFilter<$PrismaModel>
-  }
-  export type NestedJsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<NestedJsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
   export type RefreshTokenCreateWithoutUserInput = {
@@ -26261,6 +26487,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     assignment: AssignmentCreateNestedOneWithoutSubmissionsInput
     evaluations?: EvaluationCreateNestedManyWithoutSubmissionInput
   }
@@ -26275,6 +26503,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     evaluations?: EvaluationUncheckedCreateNestedManyWithoutSubmissionInput
   }
 
@@ -26464,6 +26694,8 @@ export namespace Prisma {
     sizeBytes?: IntFilter<"Submission"> | number
     releasedAt?: DateTimeNullableFilter<"Submission"> | Date | string | null
     createdAt?: DateTimeFilter<"Submission"> | Date | string
+    signature?: JsonNullableFilter<"Submission">
+    signatureParams?: JsonNullableFilter<"Submission">
   }
 
   export type RuleSetUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -27062,6 +27294,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     student: UserCreateNestedOneWithoutSubmissionsInput
     evaluations?: EvaluationCreateNestedManyWithoutSubmissionInput
   }
@@ -27076,6 +27310,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     evaluations?: EvaluationUncheckedCreateNestedManyWithoutSubmissionInput
   }
 
@@ -27096,6 +27332,9 @@ export namespace Prisma {
     similarity: number
     method?: string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: Date | string | null
+    reviewedBy?: string | null
+    reviewNote?: string | null
     createdAt?: Date | string
   }
 
@@ -27106,6 +27345,9 @@ export namespace Prisma {
     similarity: number
     method?: string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: Date | string | null
+    reviewedBy?: string | null
+    reviewNote?: string | null
     createdAt?: Date | string
   }
 
@@ -27277,6 +27519,9 @@ export namespace Prisma {
     similarity?: FloatFilter<"SimilarityMatch"> | number
     method?: StringFilter<"SimilarityMatch"> | string
     matchedSpan?: JsonNullableFilter<"SimilarityMatch">
+    reviewedAt?: DateTimeNullableFilter<"SimilarityMatch"> | Date | string | null
+    reviewedBy?: UuidNullableFilter<"SimilarityMatch"> | string | null
+    reviewNote?: StringNullableFilter<"SimilarityMatch"> | string | null
     createdAt?: DateTimeFilter<"SimilarityMatch"> | Date | string
   }
 
@@ -27416,8 +27661,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     submission: SubmissionCreateNestedOneWithoutEvaluationsInput
     metrics?: MetricResultCreateNestedManyWithoutEvaluationInput
     lineageOf?: EvaluationCreateNestedOneWithoutDerivedFromInput
@@ -27436,8 +27684,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     metrics?: MetricResultUncheckedCreateNestedManyWithoutEvaluationInput
     derivedFrom?: EvaluationUncheckedCreateNestedManyWithoutLineageOfInput
   }
@@ -27590,8 +27841,11 @@ export namespace Prisma {
     graderVersion?: StringFilter<"Evaluation"> | string
     failedReason?: StringNullableFilter<"Evaluation"> | string | null
     lineageOfId?: UuidNullableFilter<"Evaluation"> | string | null
+    stage?: StringFilter<"Evaluation"> | string
     startedAt?: DateTimeFilter<"Evaluation"> | Date | string
     finishedAt?: DateTimeNullableFilter<"Evaluation"> | Date | string | null
+    attemptCount?: IntFilter<"Evaluation"> | number
+    claimedAt?: DateTimeNullableFilter<"Evaluation"> | Date | string | null
   }
 
   export type AssignmentCreateWithoutTestCasesInput = {
@@ -27774,8 +28028,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     ruleset: RuleSetCreateNestedOneWithoutEvaluationsInput
     metrics?: MetricResultCreateNestedManyWithoutEvaluationInput
     lineageOf?: EvaluationCreateNestedOneWithoutDerivedFromInput
@@ -27794,8 +28051,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     metrics?: MetricResultUncheckedCreateNestedManyWithoutEvaluationInput
     derivedFrom?: EvaluationUncheckedCreateNestedManyWithoutLineageOfInput
   }
@@ -27925,6 +28185,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     assignment: AssignmentCreateNestedOneWithoutSubmissionsInput
     student: UserCreateNestedOneWithoutSubmissionsInput
   }
@@ -27940,6 +28202,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SubmissionCreateOrConnectWithoutEvaluationsInput = {
@@ -28024,8 +28288,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     submission: SubmissionCreateNestedOneWithoutEvaluationsInput
     ruleset: RuleSetCreateNestedOneWithoutEvaluationsInput
     metrics?: MetricResultCreateNestedManyWithoutEvaluationInput
@@ -28045,8 +28312,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     metrics?: MetricResultUncheckedCreateNestedManyWithoutEvaluationInput
   }
 
@@ -28065,8 +28335,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     submission: SubmissionCreateNestedOneWithoutEvaluationsInput
     ruleset: RuleSetCreateNestedOneWithoutEvaluationsInput
     metrics?: MetricResultCreateNestedManyWithoutEvaluationInput
@@ -28085,8 +28358,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     metrics?: MetricResultUncheckedCreateNestedManyWithoutEvaluationInput
     derivedFrom?: EvaluationUncheckedCreateNestedManyWithoutLineageOfInput
   }
@@ -28121,6 +28397,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     assignment?: AssignmentUpdateOneRequiredWithoutSubmissionsNestedInput
     student?: UserUpdateOneRequiredWithoutSubmissionsNestedInput
   }
@@ -28136,6 +28414,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type RuleSetUpsertWithoutEvaluationsInput = {
@@ -28229,8 +28509,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     submission?: SubmissionUpdateOneRequiredWithoutEvaluationsNestedInput
     ruleset?: RuleSetUpdateOneRequiredWithoutEvaluationsNestedInput
     metrics?: MetricResultUpdateManyWithoutEvaluationNestedInput
@@ -28250,8 +28533,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     metrics?: MetricResultUncheckedUpdateManyWithoutEvaluationNestedInput
   }
 
@@ -28281,8 +28567,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     submission: SubmissionCreateNestedOneWithoutEvaluationsInput
     ruleset: RuleSetCreateNestedOneWithoutEvaluationsInput
     lineageOf?: EvaluationCreateNestedOneWithoutDerivedFromInput
@@ -28302,8 +28591,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
     derivedFrom?: EvaluationUncheckedCreateNestedManyWithoutLineageOfInput
   }
 
@@ -28333,8 +28625,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     submission?: SubmissionUpdateOneRequiredWithoutEvaluationsNestedInput
     ruleset?: RuleSetUpdateOneRequiredWithoutEvaluationsNestedInput
     lineageOf?: EvaluationUpdateOneWithoutDerivedFromNestedInput
@@ -28354,8 +28649,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     derivedFrom?: EvaluationUncheckedUpdateManyWithoutLineageOfNestedInput
   }
 
@@ -28559,6 +28857,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type RuleSetCreateManyCreatedByInput = {
@@ -28660,6 +28960,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     assignment?: AssignmentUpdateOneRequiredWithoutSubmissionsNestedInput
     evaluations?: EvaluationUpdateManyWithoutSubmissionNestedInput
   }
@@ -28674,6 +28976,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     evaluations?: EvaluationUncheckedUpdateManyWithoutSubmissionNestedInput
   }
 
@@ -28687,6 +28991,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type RuleSetUpdateWithoutCreatedByInput = {
@@ -28873,6 +29179,8 @@ export namespace Prisma {
     sizeBytes: number
     releasedAt?: Date | string | null
     createdAt?: Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SimilarityMatchCreateManyAssignmentInput = {
@@ -28882,6 +29190,9 @@ export namespace Prisma {
     similarity: number
     method?: string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: Date | string | null
+    reviewedBy?: string | null
+    reviewNote?: string | null
     createdAt?: Date | string
   }
 
@@ -28964,6 +29275,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     student?: UserUpdateOneRequiredWithoutSubmissionsNestedInput
     evaluations?: EvaluationUpdateManyWithoutSubmissionNestedInput
   }
@@ -28978,6 +29291,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
     evaluations?: EvaluationUncheckedUpdateManyWithoutSubmissionNestedInput
   }
 
@@ -28991,6 +29306,8 @@ export namespace Prisma {
     sizeBytes?: IntFieldUpdateOperationsInput | number
     releasedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signature?: NullableJsonNullValueInput | InputJsonValue
+    signatureParams?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SimilarityMatchUpdateWithoutAssignmentInput = {
@@ -29000,6 +29317,9 @@ export namespace Prisma {
     similarity?: FloatFieldUpdateOperationsInput | number
     method?: StringFieldUpdateOperationsInput | string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reviewedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -29010,6 +29330,9 @@ export namespace Prisma {
     similarity?: FloatFieldUpdateOperationsInput | number
     method?: StringFieldUpdateOperationsInput | string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reviewedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -29020,6 +29343,9 @@ export namespace Prisma {
     similarity?: FloatFieldUpdateOperationsInput | number
     method?: StringFieldUpdateOperationsInput | string
     matchedSpan?: NullableJsonNullValueInput | InputJsonValue
+    reviewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reviewedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -29050,8 +29376,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
   }
 
   export type AssignmentUpdateWithoutActiveRuleSetInput = {
@@ -29117,8 +29446,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     submission?: SubmissionUpdateOneRequiredWithoutEvaluationsNestedInput
     metrics?: MetricResultUpdateManyWithoutEvaluationNestedInput
     lineageOf?: EvaluationUpdateOneWithoutDerivedFromNestedInput
@@ -29137,8 +29469,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     metrics?: MetricResultUncheckedUpdateManyWithoutEvaluationNestedInput
     derivedFrom?: EvaluationUncheckedUpdateManyWithoutLineageOfNestedInput
   }
@@ -29155,8 +29490,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type EvaluationCreateManySubmissionInput = {
@@ -29171,8 +29509,11 @@ export namespace Prisma {
     graderVersion: string
     failedReason?: string | null
     lineageOfId?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
   }
 
   export type EvaluationUpdateWithoutSubmissionInput = {
@@ -29185,8 +29526,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     ruleset?: RuleSetUpdateOneRequiredWithoutEvaluationsNestedInput
     metrics?: MetricResultUpdateManyWithoutEvaluationNestedInput
     lineageOf?: EvaluationUpdateOneWithoutDerivedFromNestedInput
@@ -29205,8 +29549,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     metrics?: MetricResultUncheckedUpdateManyWithoutEvaluationNestedInput
     derivedFrom?: EvaluationUncheckedUpdateManyWithoutLineageOfNestedInput
   }
@@ -29223,8 +29570,11 @@ export namespace Prisma {
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
     lineageOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type MetricResultCreateManyEvaluationInput = {
@@ -29252,8 +29602,11 @@ export namespace Prisma {
     toolchainFingerprint: string
     graderVersion: string
     failedReason?: string | null
+    stage?: string
     startedAt?: Date | string
     finishedAt?: Date | string | null
+    attemptCount?: number
+    claimedAt?: Date | string | null
   }
 
   export type MetricResultUpdateWithoutEvaluationInput = {
@@ -29305,8 +29658,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     submission?: SubmissionUpdateOneRequiredWithoutEvaluationsNestedInput
     ruleset?: RuleSetUpdateOneRequiredWithoutEvaluationsNestedInput
     metrics?: MetricResultUpdateManyWithoutEvaluationNestedInput
@@ -29325,8 +29681,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     metrics?: MetricResultUncheckedUpdateManyWithoutEvaluationNestedInput
     derivedFrom?: EvaluationUncheckedUpdateManyWithoutLineageOfNestedInput
   }
@@ -29343,8 +29702,11 @@ export namespace Prisma {
     toolchainFingerprint?: StringFieldUpdateOperationsInput | string
     graderVersion?: StringFieldUpdateOperationsInput | string
     failedReason?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: StringFieldUpdateOperationsInput | string
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    attemptCount?: IntFieldUpdateOperationsInput | number
+    claimedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
 
