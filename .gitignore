@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+.playwright/
+.DS_Store
+.vercel
+backend/prisma/dev.db
+backend/prisma/*.db
+docs/private/
+.pgtest/
+*.tsbuildinfo

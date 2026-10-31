@@ -1,0 +1,306 @@
+// Nyaywala - schema v2 (Week 2: the grading engine).
+// PostgreSQL 16+, UUID primary keys, timestamptz everywhere.
+// JSONB is used only where the shape is genuinely open: rule sets, metric
+// evidence, cached provider payloads.
+
+// Prisma 7: the connection string lives in prisma.config.ts, not here.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+}
+
+enum EvaluationStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  PARTIAL
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  refreshTokens RefreshToken[]
+  coursesTaught Course[]       @relation("CourseInstructor")
+  enrollments   Enrollment[]
+  submissions   Submission[]
+  ruleSets      RuleSet[]
+  auditEntries  AuditLog[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  userAgent String?   @map("user_agent")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Course {
+  id           String   @id @default(uuid()) @db.Uuid
+  instructorId String   @map("instructor_id") @db.Uuid
+  name         String
+  joinCode     String   @unique @map("join_code")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  instructor  User         @relation("CourseInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  assignments Assignment[]
+
+  @@index([instructorId])
+  @@map("courses")
+}
+
+model Enrollment {
+  courseId   String   @map("course_id") @db.Uuid
+  studentId  String   @map("student_id") @db.Uuid
+  enrolledAt DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, studentId])
+  @@index([studentId])
+  @@map("enrollments")
+}
+
+model Assignment {
+  id                String    @id @default(uuid()) @db.Uuid
+  courseId          String    @map("course_id") @db.Uuid
+  title             String
+  statement         String
+  referenceSolution String?   @map("reference_solution")
+  dueAt             DateTime? @map("due_at") @db.Timestamptz(6)
+  gradeReleaseAt    DateTime? @map("grade_release_at") @db.Timestamptz(6)
+  allowLate         Boolean   @default(false) @map("allow_late")
+  allowNoOracle     Boolean   @default(false) @map("allow_no_oracle")
+  activeRuleSetId   String?   @map("active_ruleset_id") @db.Uuid
+  publishedAt       DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course        Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  activeRuleSet RuleSet?          @relation("ActiveRuleSet", fields: [activeRuleSetId], references: [id], onDelete: SetNull)
+  ruleSets      RuleSet[]         @relation("AssignmentRuleSets")
+  testCases     TestCase[]
+  submissions   Submission[]
+  similarity    SimilarityMatch[]
+
+  @@index([courseId])
+  @@map("assignments")
+}
+
+// Immutable once published: editing creates version n + 1. The row a report
+// points at must still explain itself months later.
+model RuleSet {
+  id           String    @id @default(uuid()) @db.Uuid
+  assignmentId String    @map("assignment_id") @db.Uuid
+  version      Int
+  rules        Json
+  rulesHash    String    @map("rules_hash")
+  isPublished  Boolean   @default(false) @map("is_published")
+  createdById  String?   @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt  DateTime? @map("published_at") @db.Timestamptz(6)
+
+  assignment  Assignment   @relation("AssignmentRuleSets", fields: [assignmentId], references: [id], onDelete: Cascade)
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  activeFor   Assignment[] @relation("ActiveRuleSet")
+  evaluations Evaluation[]
+
+  @@unique([assignmentId, version])
+  @@index([assignmentId, version(sort: Desc)])
+  @@map("rule_sets")
+}
+
+model TestCase {
+  id             String   @id @default(uuid()) @db.Uuid
+  assignmentId   String   @map("assignment_id") @db.Uuid
+  name           String
+  stdin          String   @default("")
+  expectedStdout String   @map("expected_stdout") @default("")
+  isHidden       Boolean  @default(false) @map("is_hidden")
+  ordinal        Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, name])
+  @@index([assignmentId, ordinal])
+  @@map("test_cases")
+}
+
+model Submission {
+  id           String    @id @default(uuid()) @db.Uuid
+  assignmentId String    @map("assignment_id") @db.Uuid
+  studentId    String    @map("student_id") @db.Uuid
+  attempt      Int
+  source       String
+  sourceHash   String    @map("source_hash")
+  filename     String
+  sizeBytes    Int       @map("size_bytes")
+  releasedAt   DateTime? @map("released_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assignment  Assignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student     User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  evaluations Evaluation[]
+
+  @@unique([assignmentId, studentId, attempt])
+  @@index([assignmentId, studentId])
+  @@map("submissions")
+}
+
+model Evaluation {
+  id                   String           @id @default(uuid()) @db.Uuid
+  submissionId         String           @map("submission_id") @db.Uuid
+  rulesetId            String           @map("ruleset_id") @db.Uuid
+  evaluationKey        String           @unique @map("evaluation_key")
+  status               EvaluationStatus @default(QUEUED)
+  gradeHundredths      Int?             @map("grade_hundredths")
+  reportHash           String?          @map("report_hash")
+  provider             String
+  toolchainFingerprint String           @map("toolchain_fingerprint")
+  graderVersion        String           @map("grader_version")
+  failedReason         String?          @map("failed_reason")
+  lineageOfId          String?          @map("lineage_of") @db.Uuid
+  startedAt            DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt           DateTime?        @map("finished_at") @db.Timestamptz(6)
+
+  submission  Submission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  ruleset     RuleSet        @relation(fields: [rulesetId], references: [id], onDelete: Restrict)
+  metrics     MetricResult[]
+  lineageOf   Evaluation?    @relation("EvaluationLineage", fields: [lineageOfId], references: [id], onDelete: SetNull)
+  derivedFrom Evaluation[]   @relation("EvaluationLineage")
+
+  @@index([submissionId])
+  @@map("evaluations")
+}
+
+model MetricResult {
+  id           String @id @default(uuid()) @db.Uuid
+  evaluationId String @map("evaluation_id") @db.Uuid
+  name         String
+  analyzer     String
+  score        Float
+  weight       Float
+  contribution Int
+  status       String
+  evidence     Json
+  feedback     String
+  ordinal      Int    @default(0)
+
+  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationId, name])
+  @@index([evaluationId])
+  @@map("metric_results")
+}
+
+// Compile and run result reuse, keyed by content. Cuts provider cost and is
+// the same mechanism that makes a repeated grade cheap.
+model ExecutionCache {
+  cacheKey  String   @id @map("cache_key")
+  kind      String
+  output    Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("execution_cache")
+}
+
+model SimilarityMatch {
+  id           String   @id @default(uuid()) @db.Uuid
+  assignmentId String   @map("assignment_id") @db.Uuid
+  submissionA  String   @map("submission_a") @db.Uuid
+  submissionB  String   @map("submission_b") @db.Uuid
+  similarity   Float
+  method       String   @default("minhash-128")
+  matchedSpan  Json?    @map("matched_span")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionA, submissionB, method])
+  @@index([assignmentId, similarity(sort: Desc)])
+  @@map("similarity_matches")
+}
+
+// Makes the optional LLM deterministic: same prompt + params + model, same text.
+model LlmCache {
+  promptHash String   @id @map("prompt_hash")
+  model      String
+  paramsHash String   @map("params_hash")
+  response   Json
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("llm_cache")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@map("audit_log")
+}
+
+// Day 6: the budget guard that keeps the public sandbox from being exhausted.
+model ProviderUsage {
+  id        String   @id @default(uuid()) @db.Uuid
+  provider  String
+  day       DateTime @db.Date
+  calls     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([provider, day])
+  @@map("provider_usage")
+}
+
+// Section 4.4: pins the compiler into every report, so a silent upgrade is visible.
+model ToolchainFingerprint {
+  id              String   @id @default(uuid()) @db.Uuid
+  provider        String
+  compilerVersion String   @map("compiler_version")
+  stdcVersion     String   @map("stdc_version")
+  pointerBits     Int      @map("pointer_bits")
+  raw             String
+  hash            String
+  capturedAt      DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  @@index([provider, capturedAt])
+  @@map("toolchain_fingerprints")
+}

@@ -1,0 +1,139 @@
+@import 'tailwindcss';
+
+/*
+ * Tailwind v4: the dark variant is driven by a class on <html>, which the
+ * inline script in index.html sets before the first paint. `system` is a real
+ * choice, not a synonym for light.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Palette: brass, pine and olive on warm paper.
+ *
+ * Deliberately not blue or violet. The product is about fairness, so the
+ * accents are the colours of a brass scale in a warm room: amber for the
+ * primary action, teal for the secondary evidence, olive for a pass. The
+ * three are used together (brand gradient, per-metric tones) rather than one
+ * flat hue, which is what makes it read as designed instead of templated.
+ */
+:root {
+  --bg: 250 249 246;
+  --surface: 255 255 255;
+  --surface-2: 244 241 234;
+  --fg: 28 25 23;
+  --muted: 106 99 91;
+  --line: 227 221 211;
+  --brand: 161 98 7;
+  --brand-2: 15 118 110;
+  --brand-fg: 255 251 240;
+  --success: 77 124 15;
+  --danger: 185 28 28;
+  --warning: 180 83 9;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: 19 17 15;
+  --surface: 28 25 23;
+  --surface-2: 42 38 34;
+  --fg: 245 245 244;
+  --muted: 168 162 158;
+  --line: 64 59 54;
+  --brand: 250 204 21;
+  --brand-2: 45 212 191;
+  --brand-fg: 28 25 23;
+  --success: 163 230 53;
+  --danger: 248 113 113;
+  --warning: 251 191 36;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: rgb(var(--bg));
+  --color-surface: rgb(var(--surface));
+  --color-surface-2: rgb(var(--surface-2));
+  --color-fg: rgb(var(--fg));
+  --color-muted: rgb(var(--muted));
+  --color-line: rgb(var(--line));
+  --color-brand: rgb(var(--brand));
+  --color-brand-2: rgb(var(--brand-2));
+  --color-brand-fg: rgb(var(--brand-fg));
+  --color-success: rgb(var(--success));
+  --color-danger: rgb(var(--danger));
+  --color-warning: rgb(var(--warning));
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background-color: rgb(var(--brand) / 0.25);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* The two-colour mark, used on the brand tile and the landing emblem. */
+  .brand-gradient {
+    background-image: linear-gradient(135deg, rgb(var(--brand)) 0%, rgb(var(--brand-2)) 100%);
+  }
+
+  .brand-gradient-text {
+    background-image: linear-gradient(100deg, rgb(var(--brand)) 10%, rgb(var(--brand-2)) 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .paper-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--line) / 0.55) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--line) / 0.55) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-fg;
+  }
+
+  .hint {
+    @apply mt-1.5 text-xs text-muted;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand;
+  }
+
+  .nav-link[aria-current='page'] {
+    @apply bg-surface-2 text-fg;
+  }
+
+  .code {
+    @apply rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[0.8125rem] text-fg;
+  }
+}

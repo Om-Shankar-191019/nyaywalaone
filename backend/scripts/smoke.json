@@ -1,0 +1,4 @@
+{
+  "source": "#include <stdio.h>\n#include <limits.h>\n\nint add(int a, int b) {\n    return a + b;\n}\n\nint main(void) {\n    int a, b;\n    if (scanf(\"%d %d\", &a, &b) != 2) {\n        return 1;\n    }\n    printf(\"%d\\n\", add(a, b));\n    return 0;\n}\n",
+  "stdin": "2147483647 1\n"
+}

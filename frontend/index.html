@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Nyaywala - rule-driven, reproducible grading for C programming assignments." />
+    <title>Nyaywala</title>
+    <!--
+      Runs before the first paint so the stored theme is applied without a
+      flash. Keep this inline: a module import would be too late.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('nyaywala-theme') || 'system';
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = stored === 'dark' || (stored === 'system' && prefersDark);
+          var root = document.documentElement;
+          root.classList.toggle('dark', dark);
+          root.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (error) {
+          /* private mode: fall back to the dark class already on <html> */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
