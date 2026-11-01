@@ -172,7 +172,11 @@ async function loadEvaluation(evaluationId) {
 export async function runEvaluation(evaluationId) {
   const evaluation = await loadEvaluation(evaluationId);
   if (!evaluation) throw new AppError(404, 'NOT_FOUND', 'Evaluation not found');
-  if (['RUNNING', 'SUCCEEDED', 'PARTIAL'].includes(evaluation.status)) {
+  // Only a *terminal* row is skipped. RUNNING means the caller already claimed
+  // the row - the queue claim stamps RUNNING before grading - so skipping it
+  // there stranded every drained evaluation in RUNNING forever, and the next
+  // drain skipped it again for the same reason.
+  if (['SUCCEEDED', 'PARTIAL'].includes(evaluation.status)) {
     return { evaluation, skipped: true };
   }
 

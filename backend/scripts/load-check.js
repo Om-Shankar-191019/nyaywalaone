@@ -138,6 +138,33 @@ async function main() {
 
   const submissions = [];
   const prepStart = Date.now();
+
+  // A crashed worker leaves RUNNING rows that the queue only reclaims after
+  // STALE_CLAIM_MINUTES. Those rows are older than anything this run creates, so
+  // the drain would measure them instead of this cohort. Clear them first, and
+  // deliberately outside the timed window.
+  let backlogClaimed = 0;
+  let backlogResolved = 0;
+  for (let pass = 0; pass < 3; pass += 1) {
+    const batch = await drain({ limit: 500, concurrency });
+    if (batch.claimed === 0) break;
+    backlogClaimed += batch.claimed;
+    // A requeue is a legitimate outcome (a transient provider error), so it is
+    // retried in the next pass rather than treated as a failed clean-up.
+    backlogResolved += batch.succeeded + batch.partial + batch.failed;
+  }
+  if (backlogClaimed > 0) {
+    console.log(`Cleared ${backlogClaimed} backlogged evaluations first (${backlogResolved} resolved)`);
+  }
+
+  // The queue is drained oldest-first, so any row older than this cohort would be
+  // claimed instead of it. Measure nothing rather than measure the wrong thing.
+  const before = await queueDepth();
+  if (before.queued > 0) {
+    console.error(`Refusing: ${before.queued} older evaluations are still queued and would be claimed first.`);
+    console.error('Run `node scripts/requeue-stuck.js`, find why they keep returning to QUEUED, then re-run.');
+    return 1;
+  }
   for (let index = 0; index < count; index += 1) {
     const file = corpusFiles[index % corpusFiles.length];
     const base = readFileSync(join(GOLDEN, 'corpus', file), 'utf8');
@@ -173,6 +200,17 @@ async function main() {
   const summary = await drain({ limit: count, concurrency });
   const wallMs = Date.now() - startedAt;
   const stats = executionStats();
+
+  // A drain that grades nothing is not a fast drain. This happened for real: a
+  // killed harness left 38 RUNNING rows, the queue only reclaims those after
+  // STALE_CLAIM_MINUTES, so every claim in this run hit a stale row and the
+  // measurement recorded 0 calls, 0 outcomes and a flattering 6 s wall time.
+  const graded = summary.succeeded + summary.partial + summary.failed;
+  if (graded === 0) {
+    console.error('Refusing to record a measurement: the drain graded nothing.');
+    console.error('Check for stale RUNNING claims (claimed_at older than the reclaim window) and re-run.');
+    return 1;
+  }
 
   const result = {
     generated_at: new Date().toISOString(),

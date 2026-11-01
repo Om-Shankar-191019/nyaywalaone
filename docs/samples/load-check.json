@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-11-01T03:34:27.650Z",
+  "provider": "onlinecompiler",
+  "concurrency": 1,
+  "submissions": 3,
+  "enqueued_ms": 246091,
+  "drain_wall_ms": 41112,
+  "per_submission_ms": 13704,
+  "provider_calls": 0,
+  "cache_hits": 57,
+  "retries": 0,
+  "failures": 0,
+  "cache_hit_rate": 100,
+  "predicted_calls": 24,
+  "call_ratio": 0,
+  "queue_after": {
+    "queued": 0,
+    "running": 1,
+    "failed": 52,
+    "oldestQueuedAt": null,
+    "oldestQueuedSeconds": 0,
+    "maxAttempts": 3,
+    "perRunLimit": 4
+  },
+  "outcome": {
+    "succeeded": 3,
+    "partial": 0,
+    "failed": 0,
+    "requeued": 0
+  }
+}

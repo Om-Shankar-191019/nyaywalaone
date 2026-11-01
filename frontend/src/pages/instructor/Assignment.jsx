@@ -368,6 +368,33 @@ function CohortPanel({ assignmentId, onChanged }) {
     onError: (error) => setMessage(error.message),
   });
 
+  // Day 23: batch grading is a queue, not a request. This panel only enqueues,
+  // then watches the counters move; polling stops the moment nothing is left.
+  const progressQuery = useQuery({
+    queryKey: ['grading-progress', assignmentId],
+    queryFn: () => api.get(`/assignments/${assignmentId}/grading-progress`),
+    refetchInterval: (query) => {
+      const counts = query.state.data?.counts;
+      return counts && counts.queued + counts.running > 0 ? 3000 : false;
+    },
+  });
+
+  const progress = progressQuery.data;
+
+  const gradeAll = useMutation({
+    mutationFn: () => api.post(`/assignments/${assignmentId}/grade-all`, { includeFailed: true, start: true }),
+    onSuccess: async (data) => {
+      setMessage(
+        data.queued === 0
+          ? 'Nothing to grade: every submission in this cohort already has a result.'
+          : `Queued ${data.queued} of ${data.total} evaluations. The queue drains in the background at the provider's rate.`,
+      );
+      await queryClient.invalidateQueries({ queryKey: ['grading-progress', assignmentId] });
+      await refresh();
+    },
+    onError: (error) => setMessage(error.message),
+  });
+
   const data = cohortQuery.data;
   const rows = data?.submissions ?? [];
 
@@ -386,6 +413,26 @@ function CohortPanel({ assignmentId, onChanged }) {
           </a>
         }
       />
+
+      {/* Day 23: batch grading is a queue, not a request. These counters are the
+          only honest answer to "is the cohort marked yet", so they sit above the
+          table instead of behind a spinner. Polling stops when nothing is moving. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface-2/60 px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          <span className="font-medium text-fg">
+            {progress
+              ? `${progress.counts.done} of ${progress.counts.total} evaluated (${progress.percent}%)`
+              : 'Loading queue...'}
+          </span>
+          <span>queued {progress?.counts.queued ?? 0}</span>
+          <span>running {progress?.counts.running ?? 0}</span>
+          <span>failed {progress?.counts.failed ?? 0}</span>
+          {progress?.queue?.queued ? <span>queue depth {progress.queue.queued}</span> : null}
+        </div>
+        <Button size="sm" variant="secondary" loading={gradeAll.isPending} onClick={() => gradeAll.mutate()}>
+          Grade all
+        </Button>
+      </div>
 
       <div className="flex flex-wrap items-end gap-3 border-b border-line px-4 py-3">
         <Field label="Search" htmlFor="cohort-q">

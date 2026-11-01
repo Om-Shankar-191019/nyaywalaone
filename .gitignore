@@ -14,3 +14,7 @@ backend/prisma/*.db
 docs/private/
 .pgtest/
 *.tsbuildinfo
+
+# Playwright artefacts from the Day 25 journeys
+playwright-report/
+test-results/

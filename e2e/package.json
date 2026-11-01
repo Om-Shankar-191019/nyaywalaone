@@ -1,0 +1,18 @@
+{
+  "name": "nyaywala-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Day 25: Playwright journeys and accessibility checks against a running Nyaywala stack.",
+  "scripts": {
+    "test": "playwright test",
+    "test:journeys": "playwright test tests/instructor.spec.js tests/student.spec.js",
+    "test:ui-checks": "playwright test tests/theme-and-a11y.spec.js",
+    "install-browsers": "playwright install chromium",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
+    "@playwright/test": "^1.49.1"
+  }
+}

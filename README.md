@@ -1,7 +1,7 @@
-# Nyaywala — Weeks 1–3
+# Nyaywala — Weeks 1–4
 
 Rule-driven, reproducible grading for C programming assignments. This repository holds the
-**Week 1, 2 and 3 deliverables** of the four-week plan: accounts, roles, courses, a themed
+**Week 1–4 deliverables** of the four-week plan: accounts, roles, courses, a themed
 shell, a proven execution sandbox, the grading engine (submissions, versioned rule sets, the
 coordinator, every analyzer, a hashed evaluation key), and the Week 3 product surfaces — the
 report a student actually reads, the rules editor an instructor actually uses, cohort filters
@@ -82,12 +82,22 @@ Everything that needs your own account or key — and the exact line to paste it
 | 19 | Similarity: batch scan, pair review with acknowledge/flag, archived matches, instructor UI | `POST /assignments/:id/similarity/scan`, `PATCH /similarity/:matchId/review` |
 | 20 | `style` + `llm_review` analyzers, versioned limitations file inside the report, golden text-report snapshots | `grading/analyzers/style.js`, `tests/fixtures/report-view.js` |
 | 21 | Hardening: request-shape guard, binary/oversize upload checks, per-route rate limits, origin fix for deployed hosts, `docs/security.md` | `src/lib/guards.js`, `docs/security.md` |
+| 22 | Golden corpus (18 submissions × 3 rule sets × 5 repeats), verify CLI, drift fixes, CI | `tests/golden/`, `scripts/golden.js`, `scripts/verify-report.js`, `docs/reproducibility.md` |
+| 23 | Batch queue, cron drain, `grade-all`, progress counters, cost model, load check | `services/queue.js`, `docs/cost.md`, `scripts/load-check.js` |
+| 24 | Deployment runbook, readiness route, rollback notes | `docs/vercel.md`, `GET /api/health/ready` |
+| 25 | Playwright role journeys, theme persistence, axe-core and 360 px checks | `e2e/` |
+| 26 | README, API reference, rules reference, reproducibility and cost docs, sample reports | `docs/` |
+| 27 | Report content: results, usefulness and limitations, workload split, video shot list | `docs/report.md` |
+| 28 | Submission checklist, final QA, week-4 task board | `docs/submission-checklist.md`, `docs/week4-task-board.md` |
 
 **Exit criterion met:** the same submission evaluated twice returns the same `report_hash`
-and the same grade; `npm test` reports `# pass 76, # fail 0, # cancelled 0`.
+and the same grade; `npm test` reports `# pass 76, # fail 0, # cancelled 0`; the golden
+corpus produced one hash per cell across 270 runs (`docs/samples/golden-corpus.csv`).
 
-Not in this build, by design: Week 4 — the batch queue and cron drain, per-cohort analytics,
-CI. `POST /api/internal/drain` exists but stays 404 until `CRON_SECRET` is set.
+Two things in the plan cannot be produced from inside the repo and are recorded as blocked
+rather than claimed: the **public deployment** (needs your Vercel and Neon accounts —
+`docs/vercel.md` is the runbook) and the **15–20 minute video** (`docs/report.md` section 10
+is the shot list). `docs/submission-checklist.md` lists everything else with its evidence.
 
 ---
 
@@ -291,6 +301,14 @@ check rather than a broken account form.
 - [docs/linux-wsl.md](docs/linux-wsl.md) — running on Windows, WSL and Linux
 - [docs/vercel.md](docs/vercel.md) — deploy steps and the failures that actually happen
 - [docs/rule-sets/](docs/rule-sets/) — the default rule set and the LLM-weighted example
+- [docs/reproducibility.md](docs/reproducibility.md) — the five inputs, the golden corpus, what may change a grade
+- [docs/cost.md](docs/cost.md) — calls per evaluation, budget, throughput, measured load check
+- [docs/api.md](docs/api.md) — every route, generated from the router
+- [docs/rules-reference.md](docs/rules-reference.md) — each analyzer, its params and its score formula
+- [docs/report.md](docs/report.md) — the report: results, usefulness, limitations, workload split
+- [docs/demo-2.md](docs/demo-2.md) · [demo-3](docs/demo-3.md) · [demo-4](docs/demo-4.md) — the weekly demo scripts
+- [e2e/](e2e/README.md) — the two Playwright role journeys and the accessibility pass
+- [docs/submission-checklist.md](docs/submission-checklist.md) — section 17, with the evidence for each box
 
 ---
 

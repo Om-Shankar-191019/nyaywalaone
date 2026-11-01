@@ -244,3 +244,18 @@ the golden snapshot test fails if that wording changes silently.
 3. Roster submission counts, which need the `submissions` table (Day 8).
 4. `/internal/drain` + `CRON_SECRET` + the cron entry in `vercel.json`.
 5. Replace the in-memory rate limiter with a Postgres-backed counter if the app is ever public.
+
+---
+
+# Week 4 task board
+
+Days 22–28 have their own board: [week4-task-board.md](week4-task-board.md).
+
+Carried into Week 4 from Week 3, and where each one landed:
+
+| Carried item | Outcome |
+|---|---|
+| Batch queue and cron drain | Done — `services/queue.js` (`FOR UPDATE SKIP LOCKED`, stale-claim reclaim, `MAX_ATTEMPTS=3`), `POST /internal/drain`, `POST /assignments/:id/grade-all`, `GET .../grading-progress` |
+| Distributed rate limiting | Not done, deliberately — one process grades, so a per-provider semaphore is the correct scope; `docs/decisions.md` records why a Redis limiter would be a second system for no benefit at this size |
+| CI | Done — `.github/workflows/ci.yml` runs unit + integration + the golden grid summary |
+| Cohort analytics | Partial — `GET /assignments/:id/grading-progress` and the CSV export cover the operational questions; per-metric distribution charts are not in this build |

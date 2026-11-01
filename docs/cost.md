@@ -93,13 +93,35 @@ Produced by `node scripts/load-check.js --count=60` (see
 <!-- MEASURED:BEGIN -->
 | Metric | Value |
 |---|---|
-| Submissions | pending |
-| Wall time | pending |
-| Per submission | pending |
-| Provider calls | pending |
-| Predicted calls | pending |
-| Cache hit rate | pending |
-| Outcome | pending |
+| Submissions | 3 (budget-bounded: the plan's 60 needs ~480 calls against a 200/day cap) |
+| Wall time (drain only) | 41.1 s |
+| Per submission | 13.7 s at concurrency 1 |
+| Provider calls | 0 |
+| Predicted calls | 24 |
+| Cache hit rate | 100% (57 hits, 0 misses) |
+| Outcome | 3 succeeded, 0 partial, 0 failed, 0 requeued |
+| Enqueue cost | 82 s per submission (three submissions, 246 s) |
+
+Three findings from the run, each one a correction rather than a number:
+
+1. **The variant comment does not defeat the cache.** The harness appends
+   `/* load-check variant N */` so every submission is a distinct source, but
+   source normalisation strips comments before hashing, so all three submissions
+   hit the same cached executions. Consequence: this measures *queue throughput*,
+   not cold provider cost. The eight-calls-per-cold-submission figure is a model,
+   not a measurement from this run, and is labelled as such wherever it is used.
+2. **The provider rate-limits at concurrency 4.** The first attempt drained with
+   `PROVIDER_RATE_LIMITED` on twelve rows, which the queue correctly returned to
+   `QUEUED` with their attempt budget intact. The clean run used concurrency 1.
+   The recommendation below is therefore `limit=5, concurrency=1` on a one-minute
+   cron, not 2.
+3. **A queue bug this check found.** `runEvaluation` skipped any row whose status
+   was `RUNNING`, but the queue claim stamps `RUNNING` *before* grading, so every
+   drained row was skipped and stranded in `RUNNING` forever. Fixed in
+   `src/grading/coordinator.js` (only terminal rows are skipped), with
+   `scripts/requeue-stuck.js` to recover rows stranded by an older build. Before
+   the fix this check reported `0 calls, 0 outcomes, 6 s`; the script now refuses
+   to record a run that grades nothing.
 <!-- MEASURED:END -->
 
 ## 7. What this means operationally
