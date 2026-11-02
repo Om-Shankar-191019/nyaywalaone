@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Nyaywala — How It Is Built &amp; How It Works</title>
+<style>
+  @page { size: A4; margin: 15mm 14mm 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #1d2433; font-size: 9.7pt; line-height: 1.42; margin: 0; background: #fffdf8; }
+  h1, h2, h3, h4 { font-family: Georgia, "Times New Roman", serif; color: #14202e; margin: 0 0 6px; }
+  h1 { font-size: 29pt; line-height: 1.1; }
+  h2 { font-size: 16pt; padding-bottom: 5px; border-bottom: 2px solid #b07d2b; margin-bottom: 10px; }
+  h3 { font-size: 12pt; margin: 13px 0 4px; }
+  h4 { font-size: 10.5pt; margin: 10px 0 3px; }
+  p { margin: 0 0 7px; }
+  ul, ol { margin: 0 0 8px; padding-left: 19px; }
+  li { margin-bottom: 2px; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 8.9pt; background: #f0ece2; padding: 1px 4px; border-radius: 3px; }
+  pre { background: #f5f1e8; border-left: 3px solid #b07d2b; padding: 8px 10px; font-family: Consolas, monospace; font-size: 8.6pt; line-height: 1.4; white-space: pre-wrap; margin: 0 0 9px; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.9pt; margin: 7px 0 11px; }
+  th, td { border: 1px solid #ddd5c4; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #efe8d9; font-weight: 600; }
+  .page { page-break-after: always; }
+  .cover { min-height: 245mm; display: flex; flex-direction: column; justify-content: center; }
+  .kicker { letter-spacing: .18em; text-transform: uppercase; font-size: 8.4pt; color: #8a6a22; font-weight: 700; }
+  .subtitle { font-size: 12.5pt; color: #46536a; margin-top: 10px; max-width: 135mm; }
+  .rule { height: 3px; background: #b07d2b; width: 46mm; margin: 16px 0; }
+  .badge { display: inline-block; background: #14202e; color: #f7f2e6; font-size: 8.2pt; letter-spacing: .08em; text-transform: uppercase; padding: 4px 9px; border-radius: 2px; margin-top: 20px; }
+  .lead { font-size: 10.6pt; color: #3a4557; }
+  .small { font-size: 8.8pt; color: #5a6474; }
+  .sec { border-left: 3px solid #b07d2b; padding-left: 10px; margin: 12px 0 8px; }
+  .note { background: #eef3ef; border-left: 3px solid #2f6b4f; padding: 7px 10px; margin: 8px 0 11px; font-size: 9.3pt; }
+  .warn { background: #fdf1ec; border-left: 3px solid #b5471f; padding: 7px 10px; margin: 8px 0 11px; font-size: 9.3pt; }
+  .flow { margin: 8px 0 12px; page-break-inside: avoid; }
+  .node { border: 1px solid #b9c0cc; background: #fff; border-radius: 3px; padding: 5px 9px; font-size: 9pt; }
+  .node b { color: #14202e; }
+  .node.db { background: #eef3ef; border-color: #8fae9b; }
+  .node.ext { background: #fdf1ec; border-color: #d9a58f; }
+  .node.eng { background: #f6f1e3; border-color: #c9b788; }
+  .arrow { text-align: center; color: #b07d2b; font-size: 10pt; line-height: 1.05; margin: 1px 0; }
+  .lane { display: flex; gap: 8px; align-items: stretch; }
+  .lane > div { flex: 1; }
+  .lanehead { font-size: 8pt; text-transform: uppercase; letter-spacing: .08em; color: #7a6a45; font-weight: 700; margin-bottom: 4px; }
+  .toc td { border: none; padding: 2px 0; font-size: 9.8pt; }
+  .toc td.n { width: 10mm; color: #8a6a22; font-weight: 700; }
+  .kv { font-size: 9pt; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="page cover">
+  <div class="kicker">Nyaywala · rule-driven, reproducible grading for C</div>
+  <h1>How It Is Built<br />&amp; How It Works</h1>
+  <div class="rule"></div>
+  <p class="subtitle">Every feature: what it is for, what technology was used and <i>why that one</i>, where it lives in the code, and the complete end-to-end workflow — explained so you can repeat it to someone else.</p>
+  <p class="small">Companion to the <i>Feature Guide for Beginners</i> · 14 chapters · November 2026</p>
+  <div class="badge">Architecture · technology choices · workflow</div>
+</section>
+
+<!-- ============ 1. WHAT IT IS ============ -->
+<section class="page">
+  <h2>1. What the system is, in one page</h2>
+  <p class="lead">Nyaywala is a web application that grades C programming assignments the same way every time, and explains every mark it gives.</p>
+  <p>Three ideas hold it together:</p>
+  <ol>
+    <li><b>Grading is data, not code.</b> The marking scheme (“rule set”) is a JSON document an instructor edits in the browser. Change it and the marks change for everyone — no deploy.</li>
+    <li><b>The same input must produce the same output.</b> Four inputs — the source, the rule set, the test set and the toolchain — are hashed into an <i>evaluation key</i>. Same key, same stored evaluation; and the produced report has its own <i>report hash</i> anyone can re-check.</li>
+    <li><b>Nothing is pretended.</b> If the sandbox cannot enforce a memory limit, or an optional checker has no API key, the report says so instead of quietly scoring zero.</li>
+  </ol>
+
+  <h3>The four moving parts</h3>
+  <div class="flow">
+    <div class="lane">
+      <div>
+        <div class="lanehead">Browser</div>
+        <div class="node"><b>React app</b><br />pages, editor, report, cohort table</div>
+      </div>
+      <div>
+        <div class="lanehead">Your server</div>
+        <div class="node"><b>Express API</b><br />auth, rules, queue, grading engine</div>
+      </div>
+      <div>
+        <div class="lanehead">Managed</div>
+        <div class="node db"><b>PostgreSQL</b><br />users, courses, submissions, reports</div>
+      </div>
+      <div>
+        <div class="lanehead">Remote</div>
+        <div class="node ext"><b>C sandbox</b><br />onlinecompiler.io compiles &amp; runs</div>
+      </div>
+    </div>
+    <div class="arrow" style="margin-top:4px">browser ⇄ API ⇄ database · API ⇄ sandbox (one direction, budgeted)</div>
+  </div>
+
+  <h3>The stack, and why each piece</h3>
+  <table>
+    <tr><th style="width:34mm">Technology</th><th style="width:38mm">Used for</th><th>Why this one</th></tr>
+    <tr><td>React 19 + Vite 6</td><td>Web app, routing, code-splitting</td><td>Component model suits a report made of independent metric rows; Vite gives an instant dev loop. Dashboards are lazy-loaded so the code editor never reaches a phone that does not need it.</td></tr>
+    <tr><td>Tailwind CSS 4</td><td>All styling, light/dark themes</td><td>Theme is a class on <code>&lt;html&gt;</code> plus tokens, so dark mode is one variable, not a second stylesheet. Brass/pine/olive palette chosen to avoid the default blue.</td></tr>
+    <tr><td>TanStack Query</td><td>Server state, polling, refetch</td><td>Submissions are asynchronous; the queue strip must refresh itself. Query handles caching, retries and “invalidate after a mutation” without hand-written effects.</td></tr>
+    <tr><td>CodeMirror 6 (C mode)</td><td>The editor</td><td>Real C highlighting and bracket matching in the browser; no build step, no server round trip per keystroke.</td></tr>
+    <tr><td>react-hook-form + Zod</td><td>Forms and validation</td><td>One schema shape shared with the server, accessible inline errors, and no re-render per keystroke.</td></tr>
+    <tr><td>Express 4</td><td>HTTP API</td><td>A short, readable middleware chain (helmet → cookies → origin → rate limit → auth → route) is easier to audit than a framework that hides the order.</td></tr>
+    <tr><td>PostgreSQL + Prisma 7</td><td>All persistent data</td><td>Relational data with real constraints (a submission belongs to a student; an evaluation belongs to a submission). JSONB only where shapes are genuinely open — rule sets and evidence. Prisma gives typed queries and committed migrations.</td></tr>
+    <tr><td>JWT + bcrypt + httpOnly cookies</td><td>Sessions</td><td>Two roles, one institution: a hosted auth vendor would add a callback URL per environment and a pricing cliff for ~200 lines. Cookies are unreadable by page scripts, so an XSS bug cannot steal a session.</td></tr>
+    <tr><td>tree-sitter (WASM)</td><td>Real C syntax trees</td><td>Regex cannot tell a <code>for</code> inside a string from a loop, nor compute nesting depth. WASM avoids a native build toolchain on Windows and Vercel.</td></tr>
+    <tr><td>onlinecompiler.io (default)</td><td>Compile and run C</td><td>Vercel has no gcc and no Docker is allowed. One synchronous HTTP call returns compile output, stdout, stderr and exit code. Judge0 and Wandbox remain behind the same interface.</td></tr>
+    <tr><td>Node test runner + supertest</td><td>47 unit, 29 integration tests</td><td>Built into Node: no test framework to install, and integration tests can hit the real Express app and a real Postgres.</td></tr>
+    <tr><td>Playwright + axe-core</td><td>8 end-to-end checks</td><td>A real browser proves the journeys a curl cannot: tabs, polling, theme after reload, accessibility tree.</td></tr>
+    <tr><td>Groq / Llama 3.3 70B</td><td>Optional advisory feedback</td><td>Only for prose. Temperature 0, cached by prompt hash, weight 0 in the rubric — the model can never change a mark.</td></tr>
+  </table>
+
+  <h2 style="margin-top:16px">Contents</h2>
+  <table class="toc">
+    <tr><td class="n">2</td><td>The complete workflow, drawn</td></tr>
+    <tr><td class="n">3</td><td>Feature by feature: purpose, implementation, technology</td></tr>
+    <tr><td class="n">4</td><td>Inside the grading engine: the ten analyzers</td></tr>
+    <tr><td class="n">5</td><td>How a mark is computed (the arithmetic, exactly)</td></tr>
+    <tr><td class="n">6</td><td>The data model</td></tr>
+    <tr><td class="n">7</td><td>Reproducibility: keys, hashes, the golden corpus</td></tr>
+    <tr><td class="n">8</td><td>The execution layer, the budget and the queue</td></tr>
+    <tr><td class="n">9</td><td>Security and permissions</td></tr>
+    <tr><td class="n">10</td><td>How it is tested (with real numbers)</td></tr>
+    <tr><td class="n">11</td><td>Deployment and operations</td></tr>
+    <tr><td class="n">12</td><td>Decisions we made, and what we rejected</td></tr>
+    <tr><td class="n">13</td><td>Known limitations, stated honestly</td></tr>
+    <tr><td class="n">14</td><td>Where everything lives</td></tr>
+  </table>
+</section>
+
+<!-- ============ 2. WORKFLOW ============ -->
+<section class="page">
+  <h2>2. The complete workflow, drawn</h2>
+
+  <h3>2.1 One request, from click to database</h3>
+  <div class="flow">
+    <div class="node"><b>Browser</b> — a page calls <code>fetch('/api/…')</code>; cookies ride along automatically</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>Express middleware, in this order</b><br />helmet (headers) → JSON body limit → cookie parser → <b>origin check</b> (mutations must come from our own origin) → rate limit → request-shape guard (no prototype pollution, no binary) → route</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>Auth middleware</b><br />verify the short-lived JWT → <b>re-read the user from the database</b> (so a role change applies immediately) → attach <code>req.user</code></div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>Authorisation, twice</b><br />1) role guard (<code>requireRole</code>) 2) resource guard (<code>requireEnrolled</code>, <code>requireCourseOwner</code>) — foreign ids answer <b>404, never 403</b>, so ids cannot be probed</div>
+    <div class="arrow">▼</div>
+    <div class="node eng"><b>Route handler</b> — validates with Zod, then calls a service (submission, queue, grading)</div>
+    <div class="arrow">▼</div>
+    <div class="node db"><b>Prisma → PostgreSQL</b> — typed query, transaction where it matters</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>One envelope out</b> — <code>{ data }</code> on success, <code>{ error: { code, message, details? } }</code> on failure</div>
+  </div>
+  <p class="small">Why one envelope: the browser client has exactly one place to read errors, and every failure has a stable machine code (<code>ASSIGNMENT_NOT_PUBLISHED</code>, <code>PROVIDER_BUDGET_EXCEEDED</code>, …) plus a sentence a human can act on.</p>
+
+  <h3>2.2 A submission, from upload to report</h3>
+  <div class="flow">
+    <div class="node"><b>1 · Upload</b> — student presses “Submit and grade”; the file must end in <code>.c</code>, be text, and be ≤ 64 KB</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>2 · Checks before anything expensive</b> — assignment published? not closed? under the per-student daily limit? source not binary?</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>3 · Record the attempt</b> — normalise line endings, store source + <code>source_hash</code> (sha256) + attempt number</div>
+    <div class="arrow">▼</div>
+    <div class="node eng"><b>4 · Build the evaluation key</b> = sha256(source_hash · rules_hash · testset_hash · toolchain_hash · grader_version)</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>5 · Answer immediately</b> — create an <code>Evaluation</code> row with status <code>QUEUED</code>, return <b>202</b> + its id. The browser starts polling.</div>
+    <div class="arrow">▼</div>
+    <div class="node eng"><b>6 · Claim</b> — the worker takes one row with <code>SELECT … FOR UPDATE SKIP LOCKED</code> and stamps it <code>RUNNING</code></div>
+    <div class="arrow">▼</div>
+    <div class="node eng"><b>7 · Gate</b> — compile once. Compile error? stop and produce a partial report. Infinite loop suspected? skip the execution-dependent checkers.</div>
+    <div class="arrow">▼</div>
+    <div class="node eng"><b>8 · Analyzers in rule order</b> — each writes a <code>MetricResult</code> (score 0–1, weight, integer contribution, evidence)</div>
+    <div class="arrow">▼</div>
+    <div class="node eng"><b>9 · Score</b> — <code>grade = clamp(round(Σ score × weight × 100), 0, 10000)</code>, then <code>report_hash</code> over the canonical report</div>
+    <div class="arrow">▼</div>
+    <div class="node db"><b>10 · Store &amp; serve</b> — evaluation <code>SUCCEEDED</code>/<code>PARTIAL</code>; the report is readable as JSON or text, gated until the instructor releases it</div>
+  </div>
+
+  <h3>2.3 A whole cohort, batch-graded</h3>
+  <div class="flow">
+    <div class="node"><b>Instructor</b> presses <i>Grade all</i> in the cohort tab</div>
+    <div class="arrow">▼</div>
+    <div class="node"><code>POST /api/assignments/:id/grade-all</code> — queues one evaluation per submission that has none (owner only)</div>
+    <div class="arrow">▼</div>
+    <div class="node ext"><b>Cron</b> calls <code>POST /api/internal/drain</code> with <code>X-Cron-Secret</code> (the route is <b>404</b> while the secret is unset)</div>
+    <div class="arrow">▼</div>
+    <div class="node eng"><b>drain({limit, concurrency})</b> — claims up to <code>EXEC_MAX_INFLIGHT</code> rows, runs the same pipeline as a single submission, retries up to 3 attempts</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>Progress strip</b> — <code>GET /assignments/:id/grading-progress</code> polled every 3 s gives done / total / queued / running / failed</div>
+  </div>
+  <div class="note"><b>A bug this flow exposed.</b> The claim stamps a row <code>RUNNING</code> <i>before</i> grading, and the coordinator used to skip rows already marked <code>RUNNING</code> — so every claimed row was skipped and stranded forever, and batch grading silently graded nothing. Fixed: only <code>SUCCEEDED</code>/<code>PARTIAL</code> are skipped. A maintenance script (<code>scripts/requeue-stuck.js</code>) recovers rows stranded by the older build.</div>
+</section>
+
+<!-- ============ 3. FEATURES ============ -->
+<section class="page">
+  <h2>3. Feature by feature</h2>
+  <p class="lead">Same twelve questions as before, now answered technically: purpose, how it is built, which technology, and why that technology. Every “where” is a real file in this repository.</p>
+
+  <div class="sec"><h3>3.1 Accounts, sessions and roles</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Know who is asking, keep them signed in for a working session, and keep students out of instructor functions.</td></tr>
+    <tr><td>How</td><td>Register hashes the password with bcrypt (cost 10). Login issues a 15-minute HS256 access JWT and a 256-bit random refresh token in <code>httpOnly</code>, <code>SameSite=Lax</code> cookies. Only the refresh token's SHA-256 is stored. Refresh rotates the token; replaying a revoked one revokes every session for that user. Every request re-reads the role from the database.</td></tr>
+    <tr><td>Where</td><td><code>backend/src/auth/{password,jwt,cookies,sessions,middleware,rbac}.js</code>, <code>routes/auth.js</code>; client side <code>frontend/src/auth/AuthProvider.jsx</code>, <code>api/client.js</code> (single-flight 401 refresh).</td></tr>
+    <tr><td>Why</td><td>Rejected hosted auth (Clerk/Auth0): a vendor and a callback URL per environment for ~200 lines. Rejected bearer tokens in <code>localStorage</code>: an XSS bug would hand over the session. Cost accepted: the API must be same-origin in production, which the Vercel rewrite already gives.</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.2 Courses, join codes and enrolment</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Put students in a class without invitations or spreadsheets, and make membership the authorisation boundary.</td></tr>
+    <tr><td>How</td><td>An 8-character code, unique, compared case-insensitively; joining is idempotent (a unique <code>(courseId, studentId)</code> row). Enrolment rows are what <code>requireEnrolled</code> reads.</td></tr>
+    <tr><td>Where</td><td><code>routes/courses.js</code>, table <code>enrollments</code>.</td></tr>
+    <tr><td>Why</td><td>Membership as a table row (not a field on the user) means a student can be in several courses and removal is one delete. Everything else in the app can ask one cheap question: “is this person enrolled?”</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.3 Assignments and hidden test cases</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Define the work and the inputs used for correctness marking.</td></tr>
+    <tr><td>How</td><td>Assignment: title, description, due date, <code>allowLate</code>, publishing state, <code>activeRuleSetId</code>. Test case: input, expected output, ordinal, optional hidden label. Publishing is refused unless tests exist, a rule set is published, and an oracle (reference solution) is present where a checker needs it.</td></tr>
+    <tr><td>Where</td><td><code>routes/assignments.js</code>, <code>prisma/schema.prisma</code> (<code>Assignment</code>, <code>TestCase</code>), UI <code>pages/instructor/Assignment.jsx</code> (Tests tab, bulk paste).</td></tr>
+    <tr><td>Why</td><td>Tests are rows, not files, so the editor can add, edit, delete and bulk-paste them, and the same set is hashed into <code>testset_hash</code> — change a test and the evaluation key changes, so old reports stay explainable.</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.4 The rule-set editor (the marking scheme as data)</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Let an instructor change what is worth what, safely, without a deploy and without breaking past marks.</td></tr>
+    <tr><td>How</td><td>A rule set is validated by Zod (<code>schema_version</code>, <code>limits</code>, <code>on_unavailable</code>, <code>metrics[]</code>). Weights must sum to 1.00 (±0.001) and each analyzer's params are validated by that analyzer's own <code>paramsSchema</code>. Publishing freezes a new version and stores <code>rules_hash</code> (RFC 8785 canonical JSON). The editor builds its form from the analyzer registry, shows a live weight total, blocks publish when it is wrong, and diffs the new version against the active one.</td></tr>
+    <tr><td>Where</td><td><code>grading/rules.js</code>, <code>grading/canonical.js</code>, <code>grading/registry.js</code>, <code>routes/assignments.js</code> (publish), UI <code>pages/instructor/RulesPanel.jsx</code> + <code>lib/rules.js</code>.</td></tr>
+    <tr><td>Why</td><td>Data, not code: a new rubric is a new row, so every past report keeps pointing at the version that produced it. Canonical hashing (RFC 8785) means key order and whitespace cannot change a hash — the same rubric always hashes the same.</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.5 Submitting source</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Accept a C file quickly and honestly, and start grading without making the browser wait.</td></tr>
+    <tr><td>How</td><td>Checks: extension <code>.c</code>, ≤ 64 KB, no NUL byte, not binary (control-character ratio), assignment published, not late (unless allowed), under the per-student daily ceiling. Source is normalised (CRLF→LF) and hashed; attempt numbers are allocated with a unique constraint and retried on collision. Response is <b>202</b> + evaluation id; the UI polls with backoff and shows the current stage.</td></tr>
+    <tr><td>Where</td><td><code>services/submission-service.js</code>, <code>routes/submissions.js</code>, <code>lib/guards.js</code>; UI <code>pages/student/Assignment.jsx</code>, <code>lib/validation.js</code>.</td></tr>
+    <tr><td>Why</td><td>202 + polling instead of a long request: grading talks to a remote sandbox for seconds, and a serverless request that waits is a request that times out. The limits exist because the alternative is a queue full of 500 MB uploads.</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.6 The report a student reads</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Turn a number into something a student can act on, and something a teacher can defend.</td></tr>
+    <tr><td>How</td><td>Grade out of 100 with a verdict band (≥75 Good, ≥50 Needs work, else Review required; “Does not finish” when an infinite loop is suspected; “Not graded” when the evaluation failed). One row per metric: score, weight, integer contribution, evidence. A source-vs-reference diff where an oracle exists. A <i>Limitations</i> block generated from the provider's capability record and a versioned limitations file. The <code>report_hash</code> is copyable. Downloads: JSON and plain text, plus a print stylesheet.</td></tr>
+    <tr><td>Where</td><td><code>pages/student/Report.jsx</code>, <code>components/report-parts.jsx</code>, <code>lib/diff.js</code>, <code>grading/versions.js</code>, <code>grading/limitations.json</code>.</td></tr>
+    <tr><td>Why</td><td>Marks without evidence are unarguable in both directions. Showing weight × score makes the arithmetic inspectable; showing limitations prevents “we measured nothing” from looking like “you failed”.</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.7 The cohort table, release and regrade</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Give the instructor one place to see, filter, export, release and re-run marks.</td></tr>
+    <tr><td>How</td><td>Server-side filters + pagination over submissions joined to their latest evaluation. CSV export streams a stable column set. <code>PATCH /submissions/:id/release</code> sets/clears <code>releasedAt</code>; students only see grades when it is set. <code>POST /submissions/:id/regrade</code> creates a new evaluation with <code>lineageOfId</code> pointing at the previous one.</td></tr>
+    <tr><td>Where</td><td><code>routes/submissions.js</code>, <code>routes/assignments.js</code> (export), UI <code>Assignment.jsx</code> CohortPanel.</td></tr>
+    <tr><td>Why</td><td>Release is a column, not a state machine: a mark can be shown and hidden again while a query is disputed. Regrade never overwrites — lineage keeps the audit trail that a dispute needs.</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.8 Batch grading: the queue</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Grade a cohort at a rate the remote sandbox tolerates, without losing rows or double-charging.</td></tr>
+    <tr><td>How</td><td><code>claimNextEvaluation</code> uses <code>SELECT … FOR UPDATE SKIP LOCKED</code> so two workers never take the same row; a claim older than 15 minutes is reclaimable (a crashed worker cannot block the queue). Failures retry up to 3 attempts then stop. <code>drain({limit, concurrency})</code> loops until empty or the limit is reached. Progress is one aggregate query.</td></tr>
+    <tr><td>Where</td><td><code>services/queue.js</code>, <code>routes/submissions.js</code> (grade-all, grading-progress), <code>scripts/load-check.js</code>, <code>scripts/requeue-stuck.js</code>.</td></tr>
+    <tr><td>Why</td><td>The database is the queue. A separate broker (Redis/SQS) would be a second thing to run, monitor and pay for, while Postgres already has the row locks a queue needs. Cost accepted: throughput is bounded by the database, which is fine at class scale (measured: 3 submissions drained in 41 s at concurrency 1).</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.9 Similarity review</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Point an instructor at suspiciously similar work without turning a number into a punishment.</td></tr>
+    <tr><td>How</td><td>Source is tokenised and normalised, then MinHash-signed over 7-token shingles (128 permutations, seed 42). Every pair is compared; pairs above 0.85 are stored with their score. A match row carries an instructor decision (<i>acknowledged</i> / <i>flagged</i>) and a note; the grade is never changed by it.</td></tr>
+    <tr><td>Where</td><td><code>grading/analyzers/similarity.js</code>, <code>grading/similarity-scan.js</code>, <code>routes/assignments.js</code>, UI SimilarityPanel.</td></tr>
+    <tr><td>Why</td><td>MinHash makes an O(n²) comparison cheap enough for a class and deterministic (fixed seed, fixed shingle size). Advisory-only because plagiarism is a human judgement, and a false accusation is worse than a missed one.</td></tr>
+  </table>
+
+  <div class="sec"><h3>3.10 Activity feed, theme, accessibility</h3></div>
+  <table>
+    <tr><th style="width:26mm">Aspect</th><th>Detail</th></tr>
+    <tr><td>Purpose</td><td>Make changes traceable, and make the app usable on a phone and with a keyboard.</td></tr>
+    <tr><td>How</td><td>Publishes, releases, regrades and similarity decisions write an audit row, read back as a chronological feed. Theme is <code>system | light | dark</code> in <code>localStorage</code> under <code>nyaywala-theme</code>, applied by an inline script in <code>index.html</code> before the first paint. Layout reflows to 360 px; forms use real labels; axe-core is part of the test run.</td></tr>
+    <tr><td>Where</td><td><code>grading/*</code> + routes (audit), <code>frontend/index.html</code>, <code>theme/ThemeProvider.jsx</code>, <code>e2e/tests/theme-and-a11y.spec.js</code>.</td></tr>
+    <tr><td>Why</td><td>The inline script is the only reliable way to avoid a white flash: React renders too late, so the class must be on <code>&lt;html&gt;</code> before the stylesheet paints.</td></tr>
+  </table>
+</section>
+
+<!-- ============ 4. ANALYZERS ============ -->
+<section class="page">
+  <h2>4. Inside the grading engine: the ten analyzers</h2>
+  <p class="lead">Each analyzer answers one question and returns a score between 0 and 1 plus the evidence behind it. The default rule set weights them like this:</p>
+  <table>
+    <tr><th style="width:31mm">Analyzer</th><th style="width:8mm">Weight</th><th>The question it answers</th><th>How it answers it</th><th style="width:14mm">Sandbox calls</th></tr>
+    <tr><td><code>io_tests</code> (correctness)</td><td>0.20</td><td>Does the program produce the right output?</td><td>Runs every assignment test; compares output after trimming trailing whitespace and CRLF; score = passed ÷ total (partial credit on by default).</td><td>1 per test</td></tr>
+    <tr><td><code>compiler_warnings</code> (syntax)</td><td>0.10</td><td>Does it compile cleanly?</td><td>Counts compiler diagnostics from the single compile gate; <code>max(0, 1 − warnings × 0.1)</code>.</td><td>0 (reuses compile)</td></tr>
+    <tr><td><code>static_analysis</code> (structure)</td><td>0.10</td><td>Is it structured sanely?</td><td>tree-sitter AST: mean of decayed cyclomatic complexity, function length and nesting depth against limits.</td><td>0</td></tr>
+    <tr><td><code>function_split</code> (modularity)</td><td>0.10</td><td>Is it broken into functions?</td><td>Counts functions, rewards a helper, penalises a long <code>main</code>: 0.4 count + 0.2 helper + 0.4 main.</td><td>0</td></tr>
+    <tr><td><code>edge_case_runner</code> (logical)</td><td>0.10</td><td>Does it survive inputs the tests forget?</td><td>Generates zero / negative / overflow / whitespace cases, runs the student's program and — when a reference exists — the oracle, then compares. Without an oracle the score is capped at 0.5.</td><td>1 per case + 1 per oracle input (cached)</td></tr>
+    <tr><td><code>complexity_estimator</code></td><td>0.10</td><td>Is it as fast as required?</td><td>Infers an order class (<code>O(1)</code> … <code>O(2^n)</code>) from loop bounds and recursion in the AST; each level over the required class costs 0.25.</td><td>0</td></tr>
+    <tr><td><code>memory_audit</code></td><td>0.10</td><td>Is memory handled safely?</td><td>Pattern checks for leaks, unchecked allocation, banned calls (<code>gets</code>, <code>strcpy</code>, <code>sprintf</code>); optional AddressSanitizer run.</td><td>0, or 1 with ASan</td></tr>
+    <tr><td><code>style_analysis</code></td><td>0.10</td><td>Is it readable?</td><td>Identifier length, comment ratio and line length, blended and clamped; deliberately cosmetic.</td><td>0</td></tr>
+    <tr><td><code>similarity_flag</code></td><td>0.10</td><td>Is it original?</td><td>MinHash over 7-token shingles vs every other submission; 1 below 0.5 similarity, decaying to 0 at 1.0.</td><td>0</td></tr>
+    <tr><td><code>llm_review</code></td><td>0.00</td><td>Can a model add useful prose?</td><td>Groq Llama 3.3 70B, temperature 0, fixed seed, cached by prompt hash; advisory text only.</td><td>1 HTTP (not sandbox)</td></tr>
+  </table>
+
+  <div class="note"><b>Why the LLM has weight 0.</b> A model call is the least reproducible thing in the system: the provider can change the model without telling us, and then two identical submissions would earn different marks. Prose is useful; a mark that cannot be defended is not.</div>
+
+  <h3>How an analyzer is added</h3>
+  <ol>
+    <li>Create <code>grading/analyzers/&lt;name&gt;.js</code> exporting <code>{ name, supports, paramsSchema, run }</code>.</li>
+    <li>Register it in <code>grading/registry.js</code> — the rules editor builds its form from <code>paramsSchema</code>, so the UI needs no change.</li>
+    <li>Add its version to <code>ANALYZER_VERSIONS</code> in <code>grading/versions.js</code>. That changes <code>toolchain_hash</code>, so old reports stay explainable.</li>
+    <li>Add a unit test with a fixed source and an asserted score.</li>
+    <li>Document it in <code>docs/rules-reference.md</code>.</li>
+  </ol>
+  <p class="small">This is the extensibility claim in practice: a new check is a file plus a registry line, not a migration of the scoring code.</p>
+</section>
+
+<!-- ============ 5. SCORING ============ -->
+<section class="page">
+  <h2>5. How a mark is computed, exactly</h2>
+  <p>A metric returns <code>score</code> in 0–1. The coordinator turns each into an <b>integer contribution</b> in hundredths and sums them — integer arithmetic only, because floating-point addition is order-dependent and the grade must not be.</p>
+  <pre>contribution_i = round(score_i × weight_i × 100)
+grade_hundredths = clamp(Σ contribution_i, 0, 10000)      // 8900 → 89.00</pre>
+
+  <h3>Missing evidence</h3>
+  <p><code>on_unavailable</code> decides what a metric that could not run costs:</p>
+  <table>
+    <tr><th style="width:30mm">Policy</th><th>Effect</th><th>When to choose it</th></tr>
+    <tr><td><code>renormalize</code></td><td>The absent metric's weight is redistributed across the metrics that did run, so missing evidence neither helps nor hurts.</td><td>Default. The sandbox or the optional model is not the student's fault.</td></tr>
+    <tr><td><code>zero</code></td><td>The weight stays where it is; absent evidence costs marks.</td><td>When the metric is compulsory and its absence is a real failure.</td></tr>
+  </table>
+
+  <h3>Versioning on purpose</h3>
+  <p><code>GRADER_VERSION</code> and every analyzer version are hashed into the evaluation key. Changing a score formula therefore cannot silently re-grade old work: the key differs, so the old evaluation stays the answer to the old question, and a regrade is an explicit act that records lineage.</p>
+
+  <h3>The reproducibility promise</h3>
+  <pre>evaluation_key = sha256( source_hash · rules_hash · testset_hash · toolchain_hash · grader_version )
+report_hash    = sha256( canonical report JSON, minus non-deterministic text )</pre>
+  <p>Same four inputs → same key → the stored evaluation is reused instead of re-run. Same output → same <code>report_hash</code>. That second hash is what <code>scripts/verify-report.js</code> recomputes on demand, with no sandbox call.</p>
+
+  <h3>Why timing is evidence and not a score</h3>
+  <p>Timing a program on a shared runner is noise: a constant-time program and an <code>O(n)</code> program can both finish in 1 ms, and the same program is slower on a busy host. The complexity metric therefore reads the AST, where the answer is deterministic, and records timings — when available — as corroboration the report shows side by side. A disagreement between the two is visible, not averaged away.</p>
+</section>
+
+<!-- ============ 6. DATA MODEL ============ -->
+<section class="page">
+  <h2>6. The data model</h2>
+  <p class="lead">Eleven tables carry the whole product. Each arrow below is a real foreign key, not a diagram convenience.</p>
+  <div class="flow">
+    <div class="node db"><b>User</b> — email, password hash, role (STUDENT | INSTRUCTOR), name</div>
+    <div class="arrow">▼ one-to-many</div>
+    <div class="node db"><b>RefreshToken</b> — SHA-256 of the token, expiry, revoked flag</div>
+    <div class="arrow">▼</div>
+    <div class="node db"><b>Course</b> — title, code, join code, owner (instructor)</div>
+    <div class="arrow">▼ via <b>Enrollment</b> (course + student, unique pair)</div>
+    <div class="node db"><b>Assignment</b> — title, description, due date, allowLate, published, activeRuleSetId</div>
+    <div class="arrow">▼</div>
+    <div class="lane">
+      <div><div class="node db"><b>TestCase</b><br />input, expected output, ordinal</div></div>
+      <div><div class="node db"><b>RuleSet</b><br />version, rules JSONB, rules_hash</div></div>
+      <div><div class="node db"><b>Submission</b><br />student, attempt, source, source_hash</div></div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="node db"><b>Evaluation</b> — status, evaluation_key (unique), report_hash, grade_hundredths, lineageOfId, attempts</div>
+    <div class="arrow">▼ one-to-many, ordered</div>
+    <div class="node db"><b>MetricResult</b> — name, score, weight, contribution (int), status, evidence JSONB</div>
+    <div class="arrow">▼ side tables</div>
+    <div class="lane">
+      <div><div class="node db"><b>SimilarityMatch</b><br />pair, score, decision, note</div></div>
+      <div><div class="node db"><b>ProviderUsage</b><br />calls per UTC day (budget)</div></div>
+      <div><div class="node db"><b>AuditEvent</b><br />who did what, when</div></div>
+    </div>
+  </div>
+  <h3>Rules that keep it honest</h3>
+  <ul>
+    <li><b>UUID primary keys</b> — ids cannot be walked sequentially.</li>
+    <li><b><code>timestamptz</code> everywhere</b> — a mark has one meaning in every timezone.</li>
+    <li><b>JSONB only for genuinely open shapes</b> — rule sets, evidence. Anything joined or filtered is a column.</li>
+    <li><b>Unique constraints carry meaning</b>: one <code>evaluation_key</code>, one enrolment per student per course, one attempt number per student per assignment.</li>
+    <li><b>Nothing is deleted to re-grade</b>: a new evaluation points at the old one through <code>lineageOfId</code>.</li>
+  </ul>
+</section>
+
+<!-- ============ 7. REPRODUCIBILITY ============ -->
+<section class="page">
+  <h2>7. Reproducibility: keys, hashes, the golden corpus</h2>
+  <p class="lead">This is the project's central claim, so it is the most heavily tested part.</p>
+
+  <h3>Three layers of “same result”</h3>
+  <table>
+    <tr><th style="width:34mm">Layer</th><th>What it guarantees</th><th>Where it is proven</th></tr>
+    <tr><td>Evaluation key</td><td>Identical inputs do not re-run (and cannot accidentally produce two different answers).</td><td><code>grading/canonical.js</code>, unit tests on key stability</td></tr>
+    <tr><td>Report hash</td><td>Identical outputs are detectable — including months later, without a sandbox.</td><td><code>scripts/verify-report.js</code> → <code>PASS: the report recomputes to the stored hash</code></td></tr>
+    <tr><td>Golden corpus</td><td>18 sample submissions × 3 rule sets × 5 repeats = <b>270 runs, one hash per cell</b>.</td><td><code>scripts/golden.js</code> → <code>docs/samples/golden-corpus.csv</code></td></tr>
+  </table>
+
+  <h3>What was actually measured</h3>
+  <table>
+    <tr><th style="width:52mm">Result</th><th>Value</th></tr>
+    <tr><td>Golden runs</td><td>270 (18 × 3 × 5), all identical per cell</td></tr>
+    <tr><td>CSV rows</td><td>271 (header + 270), zero <code>matches_baseline=false</code></td></tr>
+    <tr><td>Provider calls in that run</td><td>0 — the execution cache absorbed repeats; 4 735 cache hits</td></tr>
+    <tr><td>Unit + integration tests</td><td>47 + 29 = 76, zero failures</td></tr>
+    <tr><td>End-to-end browser checks</td><td>8, zero failures</td></tr>
+  </table>
+
+  <h3>What can legitimately change a grade</h3>
+  <p>Only four things: the source bytes, the rule set, the test set, or the toolchain/grader version. Everything else — cache state, queue order, which worker ran it, how long it took — provably does not, because it is not in the key and not in the hash input. The report's <i>Limitations</i> block names the things that could not be measured, so “not measured” never reads as “zero”.</p>
+
+  <h3>Why canonical JSON matters</h3>
+  <p>Two rule sets that differ only in key order or whitespace must hash identically, or the cache and the audit trail would treat them as different rubrics. RFC 8785 (JSON Canonicalisation Scheme) sorts keys, fixes number formatting and forbids insignificant whitespace, giving one byte sequence per document.</p>
+</section>
+
+<!-- ============ 8. EXECUTION ============ -->
+<section class="page">
+  <h2>8. The execution layer, the budget and the queue</h2>
+  <p class="lead">The API never compiles C itself — Vercel has no toolchain and the assignment forbids Docker. One module is the only seam to the outside world.</p>
+
+  <h3>Three providers behind one interface</h3>
+  <table>
+    <tr><th style="width:32mm">Provider</th><th>Compiler flags</th><th>CPU / memory limits</th><th>Status</th></tr>
+    <tr><td><b>onlinecompiler.io</b> (default)</td><td>No</td><td>No</td><td>One synchronous call, free key, ~2 s round trip. Limits are recorded as <i>requested, not enforced</i> — the report says so.</td></tr>
+    <tr><td>Judge0 CE</td><td>Yes</td><td>Yes</td><td>Implemented, switchable by env var. The provider to use when CPU/memory enforcement matters.</td></tr>
+    <tr><td>Wandbox</td><td>No (fixed)</td><td>No</td><td>Keyless last resort; results labelled differently because there is no timing data.</td></tr>
+  </table>
+  <p>Each provider declares its <code>capabilities</code>; <code>clampLimitsFor()</code> records per-limit <code>*_limit_enforced</code> flags on the run, and the report's limitations block is generated from that record rather than from optimism.</p>
+
+  <h3>Why a provider seam at all</h3>
+  <p>The first choice (Judge0) needed a credit card for a keyed plan, so the default moved to onlinecompiler.io. Because the swap was one module and one env var, it cost no rewriting of the grading engine — which is the whole argument for the seam.</p>
+
+  <h3>Budget and rate control</h3>
+  <table>
+    <tr><th style="width:44mm">Control</th><th>Behaviour</th></tr>
+    <tr><td>Daily provider budget</td><td>Every call is counted per UTC day in <code>provider_usage</code>; over <code>EXEC_DAILY_BUDGET</code> the API answers <code>429 PROVIDER_BUDGET_EXCEEDED</code> <i>before</i> calling the sandbox.</td></tr>
+    <tr><td>Per-student daily submissions</td><td>Survives restarts, so one account cannot consume the class's whole allowance.</td></tr>
+    <tr><td>Login rate limit</td><td>5 per minute per IP + email (honest caveat: per warm instance, so it blunts a script rather than being a distributed counter).</td></tr>
+    <tr><td>Provider 429s</td><td>Mapped to <code>PROVIDER_RATE_LIMITED</code>; the queue requeues the row with its attempt budget intact. Measured: concurrency 4 triggers this, concurrency 1 drains cleanly — hence the cron runs serially.</td></tr>
+  </table>
+
+  <h3>Measured queue behaviour</h3>
+  <table>
+    <tr><th style="width:56mm">Measure</th><th>Value</th></tr>
+    <tr><td>Submissions drained in the load check</td><td>3 (budget-bounded; the plan's 60 would need ~480 calls against a 200/day cap)</td></tr>
+    <tr><td>Wall time, drain start to last graded</td><td>41.1 s</td></tr>
+    <tr><td>Per submission</td><td>13.7 s at concurrency 1</td></tr>
+    <tr><td>Outcome</td><td>3 succeeded, 0 partial, 0 failed, 0 requeued</td></tr>
+    <tr><td>Provider calls spent</td><td>0 — the appended variant comment is stripped by normalisation, so all three hit the same cached executions. This measures throughput, not cold cost.</td></tr>
+  </table>
+  <div class="warn"><b>The honest caveat:</b> cold provider cost per submission is a <i>model</i> (8 calls), not a measurement — measuring it would exceed the daily budget. The variant comment the load check appends does <i>not</i> defeat the cache (comments are stripped before hashing), so this run measures throughput; that is recorded instead of hidden.</div>
+</section>
+
+<!-- ============ 9. SECURITY ============ -->
+<section class="page">
+  <h2>9. Security and permissions</h2>
+  <p class="lead">Two roles and one institution, so the design favours things that can be read and audited over things that can be configured.</p>
+
+  <h3>Session design</h3>
+  <div class="flow">
+    <div class="node"><b>POST /auth/login</b> — bcrypt compare, rate limited (5/min per IP + email)</div>
+    <div class="arrow">▼</div>
+    <div class="node">Access JWT (HS256, 15 min, <code>httpOnly</code>) + refresh token (256-bit random, 7 days, <code>httpOnly</code>, path <code>/api/auth</code>)</div>
+    <div class="arrow">▼</div>
+    <div class="node db">Only <b>SHA-256 of the refresh token</b> is stored — a database leak does not hand over sessions</div>
+    <div class="arrow">▼</div>
+    <div class="node"><b>Rotate on every refresh.</b> Replaying a revoked token revokes <i>every</i> session for that user and clears cookies.</div>
+  </div>
+
+  <h3>Checks applied to every request</h3>
+  <table>
+    <tr><th style="width:44mm">Check</th><th>Why</th></tr>
+    <tr><td>Origin check on mutations</td><td>Cookie auth means CSRF is the real risk; a foreign <code>Origin</code> gets <code>403 CSRF_ORIGIN</code>.</td></tr>
+    <tr><td>Role re-read from the database</td><td>A role change applies on the next request; the token cannot carry a stale privilege.</td></tr>
+    <tr><td>Resource guard returns 404</td><td>An instructor asking for someone else's roster learns nothing about whether that id exists.</td></tr>
+    <tr><td>Request-shape guard</td><td>Rejects <code>__proto__</code>/<code>constructor</code> keys and binary bodies before they reach a handler.</td></tr>
+    <tr><td>Upload guards</td><td><code>.c</code> only, ≤ 64 KB, no NUL byte, control-character ratio check.</td></tr>
+    <tr><td>Helmet headers, JSON body limit</td><td>Baseline hardening with no per-route configuration to forget.</td></tr>
+    <tr><td>Secrets never in the repo</td><td><code>.env</code> ignored; <code>.env.example</code> is the contract; <code>config.js</code> validates with Zod and fails at boot if a required value is missing.</td></tr>
+  </table>
+
+  <h3>Why not a hosted auth service</h3>
+  <p>Two roles, one course, one institution: a vendor would add a dependency, a callback URL per environment and a pricing cliff for about two hundred lines of code we can explain line by line. The accepted cost is documented: the in-memory rate limiter is per warm instance, so a cold start resets it and horizontal scaling multiplies the allowance.</p>
+</section>
+
+<!-- ============ 10. TESTING ============ -->
+<section class="page">
+  <h2>10. How it is tested (with real numbers)</h2>
+  <p class="lead">Five layers, each answering a different question. All numbers below are from runs on this machine in November 2026.</p>
+  <table>
+    <tr><th style="width:34mm">Layer</th><th style="width:20mm">Result</th><th>What it answers</th></tr>
+    <tr><td>Unit tests</td><td>47 pass</td><td>Do the pure pieces behave? Canonical hashing and key-order invariance, the three hashes, weight validation, integer contributions, the status map, source normalisation, the rate limiter, request-shape and binary guards, provider capability clamping, exit-code mapping, the rule-editor helpers, and a byte-for-byte golden text report.</td></tr>
+    <tr><td>Integration tests</td><td>29 pass</td><td>Does the real app against a real Postgres enforce the matrix? Auth happy paths, duplicate email, wrong password, expired token, refresh rotation and replay rejection, logout, login rate limiting, RBAC (student cannot create a course, instructor cannot read another roster, outsiders get 404), join codes, origin checks, health.</td></tr>
+    <tr><td>Golden corpus</td><td>270/270 identical</td><td>Is grading deterministic across repeats and rule sets?</td></tr>
+    <tr><td>End-to-end (Playwright)</td><td>8 pass (1.1 min)</td><td>Do the real journeys work in a browser? Instructor tabs and rule-set publish, a student turned away from the instructor area, submit-and-read-report, light/dark after reload, axe-core on two pages, no overflow at 360 px.</td></tr>
+    <tr><td>Load check</td><td>3 submissions, 41.1 s</td><td>Does the queue drain and record outcomes instead of silently grading nothing?</td></tr>
+  </table>
+
+  <h3>Commands</h3>
+  <pre>cd backend
+npm test                     # 76 tests (47 unit + 29 integration; the integration half truncates a dedicated test database)
+npm run golden               # 270 runs → docs/samples/golden-corpus.csv
+node scripts/verify-report.js &lt;evaluationId&gt;
+npm run load-check -- --count=3
+
+cd ../e2e
+npx playwright test          # 8 browser checks (both servers must be running)</pre>
+
+  <h3>A test that earned its keep</h3>
+  <p>The load check was written to measure throughput. Its first honest run reported “0 provider calls, 6 seconds” — because <code>runEvaluation</code> skipped rows already marked <code>RUNNING</code>, which is exactly the state the queue claim sets, so every drained row was skipped and stranded. Batch grading produced nothing, silently. The fix is one condition in <code>grading/coordinator.js</code>; the script now refuses to record a run that grades nothing, so the same failure cannot pass as a good number again.</p>
+</section>
+
+<!-- ============ 11. DEPLOY ============ -->
+<section class="page">
+  <h2>11. Deployment and operations</h2>
+
+  <h3>Shape of the deployment</h3>
+  <div class="flow">
+    <div class="node"><b>One Vercel project, two services</b> (<code>vercel.json</code>): <code>/api/*</code> → Express, everything else → the Vite build</div>
+    <div class="arrow">▼</div>
+    <div class="node db"><b>Neon PostgreSQL</b> — pooled connection string at runtime, direct string for migrations</div>
+    <div class="arrow">▼</div>
+    <div class="node ext"><b>onlinecompiler.io</b> — key in the environment, budget counted in the database</div>
+  </div>
+  <p><b>Why the two connection strings:</b> serverless instances open a connection each and close it when frozen. Against a direct Postgres URL that exhausts <code>max_connections</code> during a class demo; the pooler fixes it. But pgbouncer in transaction mode cannot run migrations, so migrations take the direct URL. Getting this backwards produces “works locally, fails on first deploy”, which is why both are required at boot rather than defaulted.</p>
+
+  <h3>First deployment, in order</h3>
+  <ol>
+    <li>Add every variable from <code>backend/.env.example</code> to the Vercel project (backend service).</li>
+    <li>Set <code>APP_ORIGIN</code> to the deployed origin and <code>EXEC_SMOKE_ENABLED=false</code>.</li>
+    <li>Run <code>npx prisma migrate deploy</code> against the production direct URL.</li>
+    <li>Open <code>/api/health/ready</code> — it should return <code>ready: true</code>. That single call is the proof a deployment works: database reachable, schema current, provider key accepted, budget remaining.</li>
+  </ol>
+  <div class="warn"><b>The failure that actually happens:</b> “Requests from https://… are not allowed” on registration. That is the same-origin check doing its job, not a broken form — <code>APP_ORIGIN</code> is stale. <code>docs/vercel.md</code> covers it.</div>
+
+  <h3>Background jobs</h3>
+  <p><code>POST /api/internal/drain</code> is guarded by <code>X-Cron-Secret</code> and answers <b>404 while the secret is empty</b> (fail-closed: an unset secret must not mean an open endpoint). A cron entry calls it every minute with the secret; the drain grades one row at a time at the provider's rate. Without the secret, batch grading queues rows and nothing drains them — which the progress strip makes visible rather than silent.</p>
+
+  <h3>Rollback</h3>
+  <ul>
+    <li>Redeploy the previous build in Vercel — no database rollback is needed for a code-only change.</li>
+    <li>Scoring changes bump <code>grader_version</code>, so old reports keep their hashes; a rollback does not re-grade history.</li>
+    <li>If a migration must be undone, restore from the Neon branch/snapshot rather than hand-writing a down-migration.</li>
+  </ul>
+</section>
+
+<!-- ============ 12. DECISIONS ============ -->
+<section class="page">
+  <h2>12. Decisions we made, and what we rejected</h2>
+  <p class="lead">Six architecture decisions, each with the alternative that lost and the cost we accepted. The full text is <code>docs/decisions.md</code>.</p>
+  <table>
+    <tr><th style="width:26mm">Decision</th><th style="width:52mm">Rejected alternative and why</th><th>Cost we accepted</th></tr>
+    <tr><td><b>Compile C on a remote provider behind a seam</b></td><td>Piston: no compiler-flag field, so the syntax metric could not exist. Own VPS: a host, ops time and a security review we could not do in four weeks. Docker on Vercel: unsupported and excluded by the assignment.</td><td>No SLA on the public provider; mitigated by a budget guard, polling and a fallback provider.</td></tr>
+    <tr><td><b>tree-sitter compiled to WASM</b></td><td>Regex: cannot tell a loop inside a string from a loop, nor compute nesting. Native bindings: node-gyp and a C++ toolchain, fragile on Windows and unavailable on Vercel's build image.</td><td>The grammar ABI must match the runtime; the working pairing is recorded so an upgrade is not a guess.</td></tr>
+    <tr><td><b>Postgres on Neon with split URLs</b></td><td>A single direct URL: connection exhaustion under serverless. A proprietary backend: a rewrite if it ever moves.</td><td>Two strings to configure correctly, enforced at boot.</td></tr>
+    <tr><td><b>Own JWT + rotating refresh cookies</b></td><td>Clerk/Auth0/Supabase: a vendor and a callback URL per environment for ~200 lines. Bearer token in <code>localStorage</code>: an XSS bug hands over the session.</td><td>The API must be same-origin in production (the rewrite provides it); the rate limiter is per instance.</td></tr>
+    <tr><td><b>Complexity from the AST, not timings</b></td><td>Wall-clock curve fitting across three input sizes: noise on a shared runner, and a grade that changes when the host is busy.</td><td>Static inference can be wrong (a hidden <code>strlen</code> in a loop). The report shows the inference and the measurement as corroboration.</td></tr>
+    <tr><td><b>LLM advisory, cached, weight 0</b></td><td>Weighting model prose into the mark: provider-side model updates would change grades with no version bump we control.</td><td>Less impressive-sounding feedback, in exchange for a mark that can be defended weeks later.</td></tr>
+  </table>
+
+  <h3>What measurement changed</h3>
+  <ol>
+    <li>Judge0 collapses a null dereference and a division by zero to the same status (<code>NZEC</code>); the signal survives only in stderr, so it is exposed as a detail and no score depends on it.</li>
+    <li>AddressSanitizer <i>does</i> work under the address-space limit (the plan predicted it would die), so <code>sanitizer_run</code> is a candidate metric with a fallback.</li>
+    <li>The default provider had to change to one without a card requirement — and with that, the capability flags and the limitations block became necessary rather than nice to have.</li>
+  </ol>
+</section>
+
+<!-- ============ 13. LIMITS ============ -->
+<section class="page">
+  <h2>13. Known limitations, stated honestly</h2>
+  <table>
+    <tr><th style="width:50mm">Limitation</th><th>Consequence</th></tr>
+    <tr><td>onlinecompiler.io enforces no CPU or memory limits</td><td>Metrics that depend on resource behaviour are weaker. Limits are recorded as <i>requested, not enforced</i>, and the report says so. Judge0 is the provider that can enforce them.</td></tr>
+    <tr><td>Cold provider cost is modelled, not measured</td><td>8 calls per cold submission is a model derived from the analyzer list; measuring it needs more calls than the daily budget allows. The load check measures throughput (3 submissions, 41.1 s), not cost.</td></tr>
+    <tr><td>The login rate limiter is in-memory</td><td>Per warm instance: a cold start resets it and horizontal scaling multiplies the allowance. It blunts a script; it is not a distributed counter.</td></tr>
+    <tr><td>Similarity is a signal, not proof</td><td>A flagged pair is a reason to look. The grade never changes automatically; a human decision is recorded.</td></tr>
+    <tr><td>Static complexity inference can be wrong</td><td>A hidden O(n) call inside a loop reads as O(1). The report shows inference and measurement side by side so a reader can see the disagreement.</td></tr>
+    <tr><td>Cron is not configured in this repository</td><td>The drain route exists and is guarded; a scheduled caller must be added on the host. Until then, batch grading needs <code>Grade all</code> plus a drain call.</td></tr>
+    <tr><td>Public deployment needs the owner's accounts</td><td>Vercel and Neon credentials cannot be created from inside the repo, so the deployment is documented (<code>docs/vercel.md</code>) rather than claimed.</td></tr>
+    <tr><td>The demo video is not recorded</td><td>The shot list and timings exist in <code>docs/report.md</code>; recording is the owner's work.</td></tr>
+  </table>
+
+  <div class="note"><b>Why this page exists.</b> A grading system that hides its weak spots is worse than one that names them: a teacher can act on “the sandbox could not enforce a memory limit here”, but not on a silent zero.</div>
+</section>
+
+<!-- ============ 14. FILE MAP ============ -->
+<section class="page">
+  <h2>14. Where everything lives</h2>
+  <pre>autograder/
+├── frontend/                     React 19 + Vite 6 + Tailwind 4
+│   ├── index.html                inline theme script (no flash before paint)
+│   └── src/
+│       ├── api/client.js         envelope-aware fetch, single-flight 401 refresh
+│       ├── auth/AuthProvider.jsx session from /auth/me (never localStorage)
+│       ├── theme/                system | light | dark, key nyaywala-theme
+│       ├── components/           AppShell, RouteGuards, CodeEditor, report-parts
+│       └── pages/
+│           ├── public/           Landing, Login, Register
+│           ├── student/          Dashboard, Course, Assignment, Report
+│           └── instructor/       Dashboard, Course, Assignment, RulesPanel, Sandbox
+├── backend/
+│   ├── app.js                    middleware order, routes, error envelope
+│   ├── prisma/                   schema, migrations, seed
+│   ├── scripts/                  golden, verify-report, load-check, requeue-stuck, api-doc
+│   ├── tests/                    unit + integration + golden fixtures
+│   └── src/
+│       ├── config.js             Zod env validation, fails at boot
+│       ├── auth/                 password, jwt, cookies, sessions, middleware, rbac
+│       ├── routes/               auth, courses, assignments, submissions, exec, system
+│       ├── services/             submission-service, queue
+│       ├── grading/              coordinator, rules, canonical, score, registry, versions,
+│       │                         generators, oracle, diagnostics, limitations.json
+│       │                         analyzers/ io-tests, compiler-warnings, static-analysis,
+│       │                         function-split, edge-case-runner, complexity, memory-audit,
+│       │                         style, similarity, llm-review
+│       ├── analysis/             c-metrics, c-patterns, complexity, tree-sitter loader
+│       ├── execution/            provider seam, onlinecompiler, judge0, wandbox,
+│       │                         status, limits, budget, toolchain
+│       └── lib/                  http envelope, hash, rate limit, origin, guards, logger
+├── e2e/                          Playwright journeys, theme and accessibility checks
+├── docs/                         decisions, api, rules-reference, reproducibility, cost,
+│                                 report, security, vercel, demos, task boards, samples/
+└── vercel.json                   two services + rewrites</pre>
+
+  <h3>Reading order for a new engineer</h3>
+  <ol>
+    <li><code>README.md</code> — what it is and how to run it.</li>
+    <li><code>docs/decisions.md</code> — why the stack is what it is.</li>
+    <li><code>backend/src/grading/coordinator.js</code> — the pipeline in one file.</li>
+    <li><code>docs/rules-reference.md</code> — what each analyzer measures.</li>
+    <li><code>docs/reproducibility.md</code> — the claim, and how to test it yourself.</li>
+  </ol>
+
+  <p class="small" style="margin-top:12px">Nyaywala · implementation and workflow · generated from the running project, November 2026 · companion document: <i>Feature Guide for Beginners</i>.</p>
+</section>
+
+</body>
+</html>

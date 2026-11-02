@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Nyaywala — Feature Guide for Beginners</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #1d2433; font-size: 10.2pt; line-height: 1.46; margin: 0;
+    background: #fffdf8;
+  }
+  h1, h2, h3, h4 { font-family: Georgia, "Times New Roman", serif; color: #14202e; margin: 0 0 6px; }
+  h1 { font-size: 30pt; line-height: 1.1; }
+  h2 { font-size: 17pt; margin-top: 4px; padding-bottom: 6px; border-bottom: 2px solid #b07d2b; }
+  h3 { font-size: 12.5pt; margin: 14px 0 4px; }
+  p { margin: 0 0 8px; }
+  ul, ol { margin: 0 0 8px; padding-left: 20px; }
+  li { margin-bottom: 3px; }
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 9.2pt; background: #f0ece2; padding: 1px 4px; border-radius: 3px; }
+  pre { background: #f5f1e8; border-left: 3px solid #b07d2b; padding: 9px 11px; font-family: Consolas, monospace; font-size: 9pt; line-height: 1.45; white-space: pre-wrap; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.4pt; margin: 8px 0 12px; }
+  th, td { border: 1px solid #ddd5c4; padding: 5px 7px; text-align: left; vertical-align: top; }
+  th { background: #efe8d9; font-weight: 600; }
+  .page { page-break-after: always; }
+  .cover { display: flex; flex-direction: column; justify-content: center; min-height: 245mm; }
+  .kicker { letter-spacing: .18em; text-transform: uppercase; font-size: 8.6pt; color: #8a6a22; font-weight: 700; }
+  .subtitle { font-size: 13pt; color: #46536a; margin-top: 10px; max-width: 130mm; }
+  .badge { display: inline-block; background: #14202e; color: #f7f2e6; font-size: 8.4pt; letter-spacing: .08em; text-transform: uppercase; padding: 4px 9px; border-radius: 2px; margin-top: 22px; }
+  .rule { height: 3px; background: #b07d2b; width: 46mm; margin: 18px 0; }
+  .lead { font-size: 11pt; color: #3a4557; }
+  .feature { border: 1px solid #e4dcc9; border-left: 4px solid #b07d2b; background: #fffefb; padding: 10px 13px 8px; margin: 0 0 11px; page-break-inside: avoid; }
+  .feature h3 { margin-top: 0; }
+  .tag { font-size: 8pt; text-transform: uppercase; letter-spacing: .1em; color: #7a6a45; font-weight: 700; display: block; margin: 8px 0 2px; }
+  .tag.try { color: #1f5c46; }
+  .tag.show { color: #7a3d5c; }
+  .say { background: #f6f1e3; border: 1px dashed #c9b788; padding: 7px 10px; font-style: italic; color: #4a4029; }
+  .note { background: #eef3ef; border-left: 3px solid #2f6b4f; padding: 8px 11px; margin: 8px 0 12px; font-size: 9.8pt; }
+  .warn { background: #fdf1ec; border-left: 3px solid #b5471f; padding: 8px 11px; margin: 8px 0 12px; font-size: 9.8pt; }
+  .flow { margin: 10px 0 14px; }
+  .boxd { border: 1px solid #b9c0cc; background: #fff; border-radius: 3px; padding: 6px 9px; font-size: 9.2pt; }
+  .boxd b { color: #14202e; }
+  .arrow { text-align: center; color: #b07d2b; font-size: 11pt; line-height: 1.1; margin: 1px 0; }
+  .toc td { border: none; padding: 2px 0; font-size: 10pt; }
+  .toc td.n { width: 12mm; color: #8a6a22; font-weight: 700; }
+  .small { font-size: 9pt; color: #5a6474; }
+  .twocol { display: flex; gap: 12px; }
+  .twocol > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ================= COVER ================= -->
+<section class="page cover">
+  <div class="kicker">Nyaywala · C programming autograder</div>
+  <h1>Feature Guide<br />for Beginners</h1>
+  <div class="rule"></div>
+  <p class="subtitle">Every feature in plain language: what it does, how to test it yourself in two minutes, and how to show it to someone else without any jargon.</p>
+  <p class="small">22 features · written for someone who has never run this project before · November 2026</p>
+  <div class="badge">Read this first · no coding experience needed</div>
+</section>
+
+<!-- ================= HOW TO READ ================= -->
+<section class="page">
+  <h2>Before you start (5 minutes, once)</h2>
+  <p class="lead">The app has two parts that run together: a <b>server</b> (it stores data and grades code) and a <b>web app</b> (what you click). You start both, then use the browser.</p>
+
+  <h3>Step 1 — start the server</h3>
+  <pre>cd backend
+npm start</pre>
+  <p>Leave that window open. It prints that it is listening on <code>http://localhost:3001</code>. If it stops, everything else stops.</p>
+
+  <h3>Step 2 — start the web app (second window)</h3>
+  <pre>cd frontend
+npm run dev</pre>
+  <p>It prints <code>http://localhost:5173</code>. That is the address you open in your browser.</p>
+
+  <h3>Step 3 — sign in with a demo account</h3>
+  <table>
+    <tr><th>Who</th><th>Email</th><th>Password</th></tr>
+    <tr><td>Instructor (teacher)</td><td><code>prof@example.edu</code></td><td><code>Passw0rd-Demo-2026</code></td></tr>
+    <tr><td>Student</td><td><code>student1@example.edu</code> … <code>student8@example.edu</code></td><td><code>Passw0rd-Demo-2026</code></td></tr>
+  </table>
+  <p>There is already a course called <b>CS 101 - Programming in C</b>. Its join code is <code>ADDC2026</code>.</p>
+
+  <div class="note"><b>Two windows, one browser.</b> To show both roles at once, use one normal browser window for the instructor and one private/incognito window for the student. Otherwise the second login replaces the first.</div>
+
+  <p>Every feature below has the same three parts, so you can skim: <b>What it does</b> (plain words), <b>Try it</b> (numbered clicks), and <b>Show it</b> (a sentence to say out loud while you point at the screen).</p>
+
+  <h3>Words you will see</h3>
+  <table>
+    <tr><th>Word</th><th>What it actually means here</th></tr>
+    <tr><td>Submission / evaluation</td><td>One C file a student uploads, and the one grading run of it (queued, running, succeeded, partial or failed).</td></tr>
+    <tr><td>Report</td><td>The result page: a grade out of 100, a table of marks per category, and the teacher's comments in machine form.</td></tr>
+    <tr><td>Rule set</td><td>The marking scheme: which categories count and how much each is worth. The weights must add to exactly 1.00.</td></tr>
+    <tr><td>Analyzer</td><td>One checker inside the marking scheme, e.g. "does it produce the right output?" or "is the code readable?"</td></tr>
+    <tr><td>Cohort</td><td>All the students in one course.</td></tr>
+    <tr><td>released</td><td>The teacher has allowed students to see their grade. Until then a student sees "submitted" only.</td></tr>
+    <tr><td>report_hash</td><td>A short fingerprint of a report. Same input, same fingerprint — that is how we prove grading is repeatable.</td></tr>
+  </table>
+</section>
+
+<!-- ================= TOC ================= -->
+<section class="page">
+  <h2>What is in here</h2>
+  <table class="toc">
+    <tr><td class="n">A</td><td><b>Getting in</b> — landing page, sign up, sign in, theme</td></tr>
+    <tr><td class="n">B</td><td><b>The student journey</b> — join a course, write code, submit, read the report, download it</td></tr>
+    <tr><td class="n">C</td><td><b>The instructor journey</b> — course, assignment, test cases, rule set, publish, cohort, batch grading, similarity, activity</td></tr>
+    <tr><td class="n">D</td><td><b>Trust and everyday operations</b> — same code same grade, health checks, permissions, phone and dark mode</td></tr>
+    <tr><td class="n">E</td><td><b>A 10-minute showcase script</b> — the exact order to show things in</td></tr>
+  </table>
+
+  <h2 style="margin-top:22px">One picture of the whole thing</h2>
+  <div class="flow">
+    <div class="boxd"><b>Student</b> writes C in the browser and presses “Submit and grade”</div>
+    <div class="arrow">▼</div>
+    <div class="boxd"><b>The server</b> saves the file and puts it in a queue (a waiting line)</div>
+    <div class="arrow">▼</div>
+    <div class="boxd"><b>The queue</b> hands it to the grading engine, one at a time</div>
+    <div class="arrow">▼</div>
+    <div class="boxd"><b>The grading engine</b> compiles and runs the code on a remote sandbox, then runs ~10 checkers</div>
+    <div class="arrow">▼</div>
+    <div class="boxd"><b>A report</b> is stored: grade out of 100, marks per checker, and a fingerprint</div>
+    <div class="arrow">▼</div>
+    <div class="boxd"><b>Instructor</b> reviews the cohort, releases grades, exports a spreadsheet</div>
+    <div class="arrow">▼</div>
+    <div class="boxd"><b>Student</b> reads the report, downloads it, or fixes the code and submits again</div>
+  </div>
+  <p class="small">Nothing here needs a database administrator, a Docker container, or a compiler installed on your laptop. The code is compiled on a remote service the server talks to.</p>
+</section>
+
+<!-- ================= A ================= -->
+<section class="page">
+  <h2>Part A — Getting in</h2>
+
+  <div class="feature">
+    <h3>1. The landing page</h3>
+    <p><b>What it does:</b> the public front door. It explains what the product is, shows the balance-scale logo, and gives two buttons: <i>Sign in</i> and <i>Create account</i>. If you are already signed in, the button becomes <i>Open dashboard</i>.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open <code>http://localhost:5173</code>.</li>
+      <li>Read the headline, then click <i>Sign in</i>.</li>
+      <li>Go back to the landing page while signed in and confirm the button now says <i>Open dashboard</i>.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“This is the public page — nothing here needs a login. Notice the button changes once I am signed in, so I never have to hunt for the way back.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>2. Create an account (two kinds)</h3>
+    <p><b>What it does:</b> makes a new user. You choose <b>Student</b> (“join courses, submit code”) or <b>Instructor</b> (“create courses, grade work”). Becoming an instructor requires a secret signup code, so a student cannot promote themselves.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Click <i>Create account</i>.</li>
+      <li>Pick <b>Student</b>, fill name, email and a password (at least 8 characters), then press <i>Create account</i>.</li>
+      <li>You land in the student dashboard, already signed in.</li>
+      <li>Now try the same form with <b>Instructor</b> selected and no signup code: the form refuses and tells you a code is required. That refusal is the feature working.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Anyone can join as a student. Becoming a teacher needs a code the institution holds — so roles are not self-service.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>3. Sign in, and stay signed in safely</h3>
+    <p><b>What it does:</b> logs you in and keeps you logged in while you work. The browser holds two cookies: a short one (15 minutes) that proves who you are, and a long one (7 days) that quietly renews it. Neither is readable by page scripts, so a bug in the page cannot steal your session. If someone tries to reuse an old renewal cookie, every session for that account is cancelled.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Sign in as <code>prof@example.edu</code>.</li>
+      <li>Reload the page a few times — you stay signed in.</li>
+      <li>Wrong password once: you get a clear error, not a blank page.</li>
+      <li>Press <i>Log out</i>; you are sent back to the public pages and the dashboard no longer opens.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“The session survives a refresh but not a logout, and the browser never exposes the token to the page.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>4. Light, dark, or follow the system</h3>
+    <p><b>What it does:</b> switches the colour theme. Your choice is remembered and applied <i>before</i> the page draws, so there is no white flash when you reload.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Find the theme button in the top bar and click it through its options.</li>
+      <li>Hard-reload the page (Ctrl+F5). The theme stays, with no flash.</li>
+      <li>Close the browser and open it again: still your choice.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Watch the reload — no white flash. That is a deliberate three-line script that sets the theme before the first paint.”</p>
+  </div>
+</section>
+
+<!-- ================= B ================= -->
+<section class="page">
+  <h2>Part B — The student journey</h2>
+
+  <div class="feature">
+    <h3>5. Join a course with a code</h3>
+    <p><b>What it does:</b> puts you in a class. Codes are 8 characters and not case-sensitive, and joining twice is harmless — you stay in the course once.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Signed in as a student, look at the <i>Join a course</i> card on the dashboard.</li>
+      <li>Type <code>addc2026</code> in lowercase and press <i>Join course</i>.</li>
+      <li>The course appears in your list immediately, with its assignments.</li>
+      <li>Press <i>Join course</i> again with the same code: you are already in it, nothing breaks.</li>
+      <li>Try a wrong code: you get a friendly “code not found”, not an error stack.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“The instructor reads one code out loud, everyone types it, and the class appears. No email invitations, no spreadsheets.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>6. Open an assignment and write code in the browser</h3>
+    <p><b>What it does:</b> shows the assignment instructions, the due date, your previous attempts, and a code editor with C syntax highlighting. You can type or upload a <code>.c</code> file; the app tells you straight away if the file is the wrong type or too large (over 64 KB).</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open the CS 101 course, then the assignment.</li>
+      <li>Paste this program into the editor:</li>
+    </ol>
+    <pre>#include &lt;stdio.h&gt;
+
+int add(int a, int b) {
+    return a + b;
+}
+
+int main(void) {
+    int a, b;
+    if (scanf("%d %d", &amp;a, &amp;b) != 2) {
+        return 0;
+    }
+    printf("%d\n", add(a, b));
+    return 0;
+}</pre>
+    <ol start="3">
+      <li>Try uploading a <code>.txt</code> file: it refuses and explains that only <code>.c</code> is accepted.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“The student never leaves the page — editor, checks and submission are one screen.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>7. Submit and watch it grade</h3>
+    <p><b>What it does:</b> sends the file for marking. The page does not freeze: it shows the stage (“compiling…”, “running tests…”), then the result. The button stays disabled while a run is in flight so a double click cannot submit twice.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>With the program above, press <i>Submit and grade</i>.</li>
+      <li>Watch the button text change through the stages. This takes a few seconds because the code is compiled on a remote service.</li>
+      <li>When it finishes you get a confirmation and a link to the report.</li>
+    </ol>
+    <div class="warn"><b>If it says “Submitted. Your grade appears once your instructor releases it”</b>, that is correct behaviour, not a bug: grades stay hidden until the teacher releases them.</div>
+    <span class="tag show">Show it</span>
+    <p class="say">“Notice the stages: the page is telling me exactly what the server is doing, instead of a spinner that could mean anything.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>8. Read the report</h3>
+    <p><b>What it does:</b> explains the grade. You get the mark out of 100 with a plain verdict (<i>Good</i>, <i>Needs work</i>, <i>Review required</i>), a table with one row per marking category showing the score, the weight, and the marks it contributed, plus the evidence behind each row, a side-by-side difference against a reference solution where the assignment has one, a <i>Limitations</i> box saying what could not be measured for this run, and the fingerprint (<code>report_hash</code>).</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open the report from the submission confirmation.</li>
+      <li>Find the big grade and the verdict text.</li>
+      <li>Scroll to the metric table: every category shows score → weight → marks. Check that the marks add up to the grade.</li>
+      <li>Read the limitations box: it lists what this sandbox could not enforce.</li>
+      <li>Copy the <code>report_hash</code> — a 64-character fingerprint.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“This is not a black box: each mark shows its weight and its share, and if something could not be measured the report says so instead of quietly giving zero.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>9. Download or print the report</h3>
+    <p><b>What it does:</b> gives you the same report as a JSON file (for a script or a spreadsheet) or a plain-text file (for a portfolio or an email), and a print layout that turns the page into a clean PDF.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>On the report page press the download button and choose JSON — the file opens in any editor.</li>
+      <li>Download the text version and open it in Notepad: it is readable without any tool.</li>
+      <li>Press <i>Print</i> and look at the preview: navigation and buttons disappear, only the report prints.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“JSON for machines, text for humans, print for an archive — from one stored report.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>10. Submit again, and see your attempts</h3>
+    <p><b>What it does:</b> every upload is kept as its own attempt, numbered. Re-submitting the same file still produces a report of its own, but the expensive part — compiling and running the code — is reused from a cache, so it costs nothing and grades identically.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Submit the same program a second time.</li>
+      <li>Open both reports: the grade and the <code>report_hash</code> are identical.</li>
+      <li>Change one number in the program, submit again: the grade changes and the attempts list shows attempt 3.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Same file twice gives the same fingerprint and costs nothing extra — that is the promise of the whole project, visible on one screen.”</p>
+  </div>
+</section>
+
+<!-- ================= C ================= -->
+<section class="page">
+  <h2>Part C — The instructor journey</h2>
+
+  <div class="feature">
+    <h3>11. Create a course and share one code</h3>
+    <p><b>What it does:</b> makes a new class and generates its 8-character join code. The course page lists the students who joined, with their activity, and lets you remove someone from the roster.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Signed in as <code>prof@example.edu</code>, open the instructor dashboard.</li>
+      <li>Fill in “create a course” (title and code, e.g. <i>CS 102 — Data Structures</i>).</li>
+      <li>The new card shows its join code; click it to copy.</li>
+      <li>Open the course and look at the roster: names, emails, how many submissions each student has.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“One code per course, one roster that updates itself as students join.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>12. Create an assignment and its hidden test cases</h3>
+    <p><b>What it does:</b> defines the work: title, description, due date, whether late work is allowed, and the tests used for marking. Each test is an input and the expected output. Students never see them. <i>Bulk paste</i> lets you add many tests at once instead of one form at a time.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open a course and create an assignment (title: <i>Add two integers</i>).</li>
+      <li>Open its <b>Tests</b> tab and add one test: input <code>2 3</code>, expected output <code>5</code>.</li>
+      <li>Use <i>Bulk paste</i> to add two more: <code>-4 4</code> → <code>0</code> and <code>1000000 2000000</code> → <code>3000000</code>.</li>
+      <li>Delete one test and watch the list shrink.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Tests are data, not code: the instructor types the inputs and the expected output, and the engine does the rest.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>13. The rule set editor — the marking scheme</h3>
+    <p><b>What it does:</b> lets you decide what counts. Each row is one category with a weight; a live total shows how much of the grade is allocated and publishing is blocked until the weights add to <b>exactly 1.00</b>. Before publishing, it shows a diff against the current version, so you can see what is about to change for every future mark.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open the assignment's <b>Rule set</b> tab.</li>
+      <li>Find the weight total. Change one weight so the total is no longer 1.00.</li>
+      <li>Press publish: it refuses and explains why. (That refusal is the feature.)</li>
+      <li>Put the weight back, press publish again: it succeeds and the version number goes up.</li>
+      <li>Look at the publish diff: it names the fields that changed.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“A rubric where the weights do not add up is a rubric that cannot produce a mark, so the editor simply will not let it through.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>14. Publish the assignment</h3>
+    <p><b>What it does:</b> opens the assignment to students. It refuses to publish unless the assignment has tests, a published rule set, and (for the smarter checkers) a reference solution — so an empty assignment cannot go live by accident.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>On an assignment with no tests, press <i>Publish assignment</i>: it refuses, naming what is missing.</li>
+      <li>Add tests and a rule set, then publish again: the status becomes published and students can submit.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“The system refuses to publish an assignment a student could submit to and get nonsense back.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>15. The cohort table — every student, one screen</h3>
+    <p><b>What it does:</b> lists submissions with student, attempt, time, and grade. You can filter and page through them, export everything to CSV for a spreadsheet, and per row either <b>Release</b> the grade to the student or <b>Regrade</b> it. A regrade creates a new evaluation that remembers which one it came from, so history is never overwritten.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open the assignment's <b>Cohort</b> tab.</li>
+      <li>Filter by a student's name and confirm the list narrows.</li>
+      <li>Press the export button: a CSV downloads. Open it and check the columns.</li>
+      <li>On a row, press <i>Release</i>: the student can now see the grade. Press again (<i>Unrelease</i>) to hide it.</li>
+      <li>Press <i>Regrade</i> on one row and watch the new evaluation appear with the same grade.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Release when marking is done, export for the registry, regrade when a rubric changes — and the old marks stay in the history.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>16. Grade all — batch grading with a visible queue</h3>
+    <p><b>What it does:</b> queues every submission that has not been graded yet and shows a progress strip: <i>done of total (percent) · queued · running · failed</i>. It updates by itself every few seconds. Work is done one at a time, at the speed the remote compiler allows, so it cannot be rate-limited into failure.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>In the <b>Cohort</b> tab find the queue strip and note the counts.</li>
+      <li>Press <i>Grade all</i>.</li>
+      <li>Watch the numbers change without touching the page: queued falls, running shows 1, done rises.</li>
+      <li>When it reaches 100%, open a report to confirm a real grade was produced.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“One click for a whole class, and the counter tells me exactly how far along it is — no refreshing, no guessing.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>17. Similarity — flagging lookalike code</h3>
+    <p><b>What it does:</b> compares every submission in the assignment with every other one and lists the pairs that look alike. A flag is a reason to look, never an automatic punishment: you decide <i>acknowledge</i> or <i>flag</i>, and your decision is stored with a note.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open the <b>Similarity</b> tab and press the scan button.</li>
+      <li>When it finishes, the list shows pairs with a similarity score.</li>
+      <li>Pick one pair and record a decision with a short note.</li>
+      <li>Reload: the decision is still there.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“This is an originality signal, not a verdict — the grade never changes automatically; a human decision does.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>18. The activity feed</h3>
+    <p><b>What it does:</b> a chronological list of what happened on the assignment: rule sets published, grades released, regrades run, similarity decisions made. It answers “who changed the marking, and when?”</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Publish a rule set and release one grade.</li>
+      <li>Open the Activity panel: both actions are listed with a timestamp.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Every decision that affects a mark leaves a trace, so a disputed grade has a history rather than a shrug.”</p>
+  </div>
+</section>
+
+<!-- ================= D ================= -->
+<section class="page">
+  <h2>Part D — Trust and everyday operations</h2>
+
+  <div class="feature">
+    <h3>19. Same code, same grade — proven, not claimed</h3>
+    <p><b>What it does:</b> the same file, marked under the same rule set, always produces the same grade and the same <code>report_hash</code>. A command-line checker can re-check a stored report and tell you whether it still recomputes. A larger “golden corpus” run marks 18 sample programs under 3 marking schemes, 5 times each, and confirms all 270 results are identical.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Submit one file twice; compare the two <code>report_hash</code> values (identical).</li>
+      <li>In a terminal: <code>cd backend</code> then <code>node scripts/verify-report.js &lt;evaluation-id&gt;</code>. It prints <code>PASS</code> and says the report recomputes to the stored hash.</li>
+      <li>For the full proof: <code>npm run golden</code>. It takes several minutes and prints the 270-run table into <code>docs/samples/golden-corpus.csv</code>.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Anyone can check a stored grade without asking the sandbox again — that is what makes the mark defensible two weeks later.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>20. Health pages — “is the system okay?”</h3>
+    <p><b>What it does:</b> two plain addresses. One says the server is alive and can reach the database. The other is the honest one: it checks database, database version, the compiler service key and the remaining daily budget, and lists each as ok or failing.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Open <code>http://localhost:3001/api/health</code> — you should see <code>"db": "ok"</code>.</li>
+      <li>Open <code>http://localhost:3001/api/health/ready</code> — every check should say ok and the top line <code>ready: true</code>.</li>
+      <li>If grading ever fails, this is the first page to open: it names the broken piece.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“One URL answers ‘why might a submission fail right now?’ before a student has to report it.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>21. Roles and privacy</h3>
+    <p><b>What it does:</b> keeps students and instructors apart. A student who types an instructor address gets a page saying that area is for instructors. Asking for someone else's course or roster returns “not found” rather than “forbidden”, so nobody can probe which ids exist.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Signed in as a student, go to <code>http://localhost:5173/instructor</code> — you see “This area is for instructors”.</li>
+      <li>Signed in as an instructor, try to open a course you do not own: not found.</li>
+      <li>Signed out, open <code>/student</code>: you are sent to sign in.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“Permissions are checked on the server for every request, and the answer never leaks whether someone else's data exists.”</p>
+  </div>
+
+  <div class="feature">
+    <h3>22. Works on a phone, and with a screen reader</h3>
+    <p><b>What it does:</b> the layout reflows down to a 360-pixel-wide screen, keyboard focus is visible, form fields have real labels, and an automated accessibility check reports no critical problems on the sign-in page and the dashboard.</p>
+    <span class="tag try">Try it</span>
+    <ol>
+      <li>Make the browser window very narrow — the tables become cards and nothing scrolls sideways.</li>
+      <li>Press Tab repeatedly: every control shows where the focus is.</li>
+      <li>Automatic proof: <code>cd e2e</code> then <code>npx playwright test</code> (both servers must be running). All 8 checks pass.</li>
+    </ol>
+    <span class="tag show">Show it</span>
+    <p class="say">“The same app on a phone in class, and it passes an automated accessibility check rather than just looking fine.”</p>
+  </div>
+
+  <div class="note"><b>What is not built yet, said plainly:</b> the public deployment needs your own Vercel and Neon accounts, and the recorded video is yours to make. Everything above runs locally today. Nothing in this guide pretends otherwise.</div>
+</section>
+
+<!-- ================= E ================= -->
+<section class="page">
+  <h2>Part E — A 10-minute showcase, in order</h2>
+  <p class="lead">Do these in this order. Each row is one click-path and one sentence to say. Have the instructor window and a private student window ready.</p>
+
+  <table>
+    <tr><th style="width:8mm">#</th><th style="width:52mm">Do this</th><th>Say this</th></tr>
+    <tr><td>1</td><td>Landing page, then sign in as the instructor</td><td>“Two roles, one app: students submit, instructors mark.”</td></tr>
+    <tr><td>2</td><td>Open the course, show the join code and roster</td><td>“One code gets a whole class in; the roster updates itself.”</td></tr>
+    <tr><td>3</td><td>Open the assignment's <b>Tests</b> tab</td><td>“Tests are data: input and expected output, hidden from students.”</td></tr>
+    <tr><td>4</td><td>Open <b>Rule set</b>, change a weight so the total is wrong, try to publish</td><td>“It refuses — a rubric has to add up to exactly 1.00.”</td></tr>
+    <tr><td>5</td><td>Fix the weight and publish; show the diff</td><td>“Publishing is versioned, and I can see exactly what changed.”</td></tr>
+    <tr><td>6</td><td>In the private window, join with <code>ADDC2026</code> and open the assignment</td><td>“The student sees only their work and their attempts.”</td></tr>
+    <tr><td>7</td><td>Paste the sum program, press <i>Submit and grade</i>, watch the stages</td><td>“The code is compiled on a remote sandbox — the page reports each stage.”</td></tr>
+    <tr><td>8</td><td>Open the report: grade, metric table, diff, limitations, fingerprint</td><td>“Every mark shows its weight and contribution, and unmeasured things are declared.”</td></tr>
+    <tr><td>9</td><td>Download JSON, then show Print preview</td><td>“Same report for a script, for an email, or for an archive.”</td></tr>
+    <tr><td>10</td><td>Student tries <code>/instructor</code></td><td>“Server-side roles: students cannot reach the marking area.”</td></tr>
+    <tr><td>11</td><td>Instructor: <b>Cohort</b> → <i>Grade all</i>, watch the counters</td><td>“One click queues a whole class and shows progress live.”</td></tr>
+    <tr><td>12</td><td><i>Release</i> a grade, then the student reloads their report</td><td>“Grades stay hidden until the instructor releases them.”</td></tr>
+    <tr><td>13</td><td>Export CSV and open it</td><td>“The registry gets a spreadsheet, not a screenshot.”</td></tr>
+    <tr><td>14</td><td><b>Similarity</b> tab → scan → record a decision</td><td>“A flag is a reason to look; a human decides, and the decision is logged.”</td></tr>
+    <tr><td>15</td><td>Submit the same file again, compare the two fingerprints</td><td>“Same code, same grade, same fingerprint — that is the whole thesis.”</td></tr>
+    <tr><td>16</td><td>Open <code>/api/health/ready</code></td><td>“And here is the one page that says whether grading can work right now.”</td></tr>
+  </table>
+
+  <h3>Before you present — 6-point check</h3>
+  <ul>
+    <li>Backend and frontend both running; the readiness page says <code>ready: true</code>.</li>
+    <li><code>EXEC_DAILY_BUDGET</code> has room left (the readiness page shows the count).</li>
+    <li>One student account already joined the course, so the cohort is not empty.</li>
+    <li>The assignment already has tests and a published rule set.</li>
+    <li>A private window is signed in as a student, ready, before you start talking.</li>
+    <li>The report page is pre-loaded in a background tab in case the sandbox is slow.</li>
+  </ul>
+
+  <h3>If something goes wrong while you present</h3>
+  <table>
+    <tr><th>Symptom</th><th>What to do</th></tr>
+    <tr><td>Submit button spins for a long time</td><td>The remote compiler is slow. Say so: grading is a queue, and the report will still be correct. Do not click twice.</td></tr>
+    <tr><td>“Grade appears once released”</td><td>Correct behaviour. Press <i>Release</i> in the cohort table, then reload the student's report.</td></tr>
+    <tr><td>Readiness page shows the budget exhausted</td><td>The daily sandbox allowance is spent. Wait for 00:00 UTC, or raise <code>EXEC_DAILY_BUDGET</code> in <code>backend/.env</code> and restart.</td></tr>
+    <tr><td>Server stopped</td><td>Restart <code>npm start</code> in <code>backend</code>; nothing is lost, all data is in the database.</td></tr>
+    <tr><td>A grade looks wrong</td><td>Open the report: the metric table shows which checker gave what. That is the answer, not a guess.</td></tr>
+  </table>
+
+  <p class="small" style="margin-top:14px">Nyaywala — feature guide for beginners · generated from the running project, November 2026 · companion document: <i>Implementation &amp; Workflow</i>.</p>
+</section>
+
+</body>
+</html>
