@@ -2,14 +2,20 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import bcrypt from 'bcryptjs';
+import { createPool, waitForDatabase } from '../src/lib/pg-pool.js';
+import { describePrismaError } from '../src/lib/prisma-errors.js';
 import { defaultRules, resolveRules } from '../src/grading/rules.js';
 import { rulesHash } from '../src/grading/canonical.js';
 
 // Prisma 7 needs a driver adapter; the seed is standalone so it can run
 // without the full app environment (no ACCESS_TOKEN_SECRET required).
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
+//
+// It uses the API's pool settings (src/lib/pg-pool.js) because the seed is the
+// first command a fresh clone runs, and therefore the first thing to meet a
+// cold Neon compute. Without the connect retries it dies with an empty Prisma
+// message: `Seed failed:` and nothing else.
+const pool = createPool(process.env.DATABASE_URL);
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'Passw0rd-Demo-2026';
 const INSTRUCTOR_EMAIL = 'prof@example.edu';
@@ -31,6 +37,14 @@ const STUDENTS = [
  * password that someone already changed.
  */
 async function main() {
+  const reachable = await waitForDatabase(pool);
+  if (!reachable.ok) {
+    console.error('Cannot reach the database:', describePrismaError(reachable.error));
+    console.error('Run `npm run db:check` to see which step fails (env, DNS, TCP, login, schema), then retry.');
+    process.exitCode = 1;
+    return;
+  }
+
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
 
   const instructor = await prisma.user.upsert({
@@ -141,7 +155,10 @@ int main(void) {
 
 main()
   .catch((error) => {
-    console.error('Seed failed:', error.message);
+    console.error('Seed failed:', describePrismaError(error));
     process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect().catch(() => {});
+    await pool.end().catch(() => {});
+  });

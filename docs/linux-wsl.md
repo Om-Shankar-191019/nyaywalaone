@@ -262,3 +262,53 @@ point the proxy at it instead of fighting the boundary:
 ```bash
 VITE_API_PROXY_TARGET=http://$(hostname).local:3001 npm run dev
 ```
+
+### 10.3 `[ETIMEDOUT]` / `503 DB_UNAVAILABLE` on one request, fine on the next
+
+```
+[error:prisma] 93f37860-... [ETIMEDOUT] Invalid `prisma.user.findUnique()` invocation:
+[2026-11-02T19:27:02.236Z] INFO POST /api/courses/join -> 503 832ms
+```
+
+`ETIMEDOUT` is the socket, not the SQL: the connection to the pooled host never
+completed, so no query ran and nothing is wrong with the route or the data. It
+is intermittent because the connection is re-established constantly - one
+connection per idle gap, each paying DNS + TCP + TLS to a Neon region half a
+world away, over WSL2's NAT.
+
+Why the gaps turn into failures: the pool used to close idle connections after
+30 s. Sign in, read a page, think for a minute, join a course - that join paid
+for a brand-new handshake, and on a WSL2 link one of those handshakes lands on
+a resolver or NAT mapping that has gone stale, which is the `ETIMEDOUT`. The
+same reason made `npm run db:seed` fail on a cold clone with the blank
+`Invalid prisma.user.upsert() invocation:` message.
+
+What the code does now:
+
+- connections stay open for **ten minutes** of idle time and use TCP keepalive,
+  so an ordinary pause does not force a reconnect;
+- a connect that fails *before* the statement is sent is retried **three times**
+  with backoff (250 ms, 500 ms) on both `pool.query` and `pool.connect`, so one
+  bad handshake is not a 503 and cannot duplicate a write;
+- the first connection is opened at boot (`[db] pool warm after 1 attempt(s)`),
+  so nobody's sign-in pays for it;
+- the seed uses the same pool and prints the real cause instead of a blank line.
+
+If `ETIMEDOUT` keeps happening, it is the path to Neon, not the app:
+
+```bash
+cd backend
+npm run db:check          # DNS and TCP lines name the failing step
+```
+
+- `FAIL DNS` with `ETIMEDOUT`/`EAI_AGAIN`: WSL2's resolver. Add
+  `[network]\ngenerateResolvConf = false` to `/etc/wsl.conf`, write
+  `nameserver 1.1.1.1` into `/etc/resolv.conf`, then `wsl --shutdown` from Windows
+  and reopen.
+- `OK DNS`, `FAIL TCP`: a VPN, campus firewall or proxy is dropping 5432. Try
+  another network, or move the database closer (pick the Neon region nearest
+  you and re-create the project there - the URL changes with it).
+- both `OK` but requests still stall for seconds: you are far from the region.
+  Latency to the pooler is the whole cost of the first query; a closer region
+  fixes it, and everything in the app is a single round trip away from being fast.
+- `FAIL SCHEMA` after a successful login: `npm run db:deploy && npm run db:seed`.
