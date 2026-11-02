@@ -38,6 +38,11 @@ cd backend
 npx prisma generate
 ```
 
+`npm ci` already runs that as a `postinstall` step, so the command above only
+matters if you installed with `--ignore-scripts` or changed `schema.prisma`.
+On Linux the generator is the same JavaScript client (Prisma 7 has no Rust
+engine to download), so nothing platform-specific is fetched.
+
 ## 3. Environment
 
 ```bash
@@ -47,6 +52,21 @@ cp backend/.env.example backend/.env
 Fill in `DATABASE_URL`, `DIRECT_URL`, `ACCESS_TOKEN_SECRET`, `APP_ORIGIN` and
 `ONLINECOMPILER_API_KEY`. See [credentials.md](credentials.md) for where each one
 comes from.
+
+Then prove the two database strings before starting anything else:
+
+```bash
+cd backend
+npm run db:check
+```
+
+It walks environment, URL shape, DNS, TCP, authentication and schema, prints one
+line per step, names the fix for the first thing that fails, and never prints a
+password - so its output is safe to paste into a chat or an issue.
+
+Two rules it enforces, because swapping them is the most common fresh-clone bug:
+`DATABASE_URL` is the **`-pooler`** host (runtime queries), `DIRECT_URL` is the
+**direct** host (migrations; pgbouncer cannot run them).
 
 ### Line endings — the one that actually bites
 
@@ -160,3 +180,85 @@ UPDATE_GOLDEN=1 npm test
 3. **`CRLF` in a file created on Windows** and then read by a Linux tool. Node
    does not care; `awk` and `grep` do. If a test fails with a stray `^M`, run the
    `awk` check from §3.
+
+---
+
+## 10. Two errors every fresh Linux clone hits, and what they mean
+
+### 10.1 `POST /api/auth/login -> 500` with a blank Prisma message
+
+```
+prisma:error
+Invalid `prisma.user.findUnique()` invocation:
+
+[error] a707611f-... PrismaClientKnownRequestError:
+Invalid `prisma.user.findUnique()` invocation:
+
+    at .../src/routes/auth.js:85:18
+[2026-11-02T17:49:00.078Z] INFO POST /api/auth/login -> 500 343ms
+```
+
+Nothing above the arrow is the bug: there is no bug in the login route. Prisma 7
+reaches Postgres through a driver adapter, and when the *connection* fails it
+raises a `PrismaClientKnownRequestError` whose message is empty because the real
+cause lives in `meta`/`cause`. An `.env` file can be present and still be the
+problem - it may hold the `.env.example` placeholder host, the direct URL where
+the pooled one belongs, or a password that was rotated after the file was saved.
+
+Diagnose, in this order:
+
+```bash
+cd backend
+npm run db:check            # names the layer: env / URL / DNS / TCP / login / schema
+```
+
+| `db:check` says | Cause | Fix |
+|---|---|---|
+| `FAIL DATABASE_URL` placeholder | `.env` was copied but not filled in | paste the Neon strings again |
+| `FAIL DNS` / `FAIL TCP` | wrong host, paused Neon project, VPN or firewall | wake the project in the Neon console |
+| `FAIL LOGIN ... password authentication failed` | credential rotated | re-copy both strings |
+| `FAIL SCHEMA missing table(s)` | migrations never ran | `npm run db:deploy && npm run db:seed` |
+
+Why it looked intermittent: a Neon free project **suspends when idle**, and the
+first query after a suspend can fail while the compute wakes. The API now retries
+one connection-level failure before giving up, and answers `503 DB_UNAVAILABLE`
+with a request id instead of an opaque 500. The real cause is logged as
+`[error:db] <request-id> ...`, so the id shown in the browser reaches the line
+that explains it.
+
+### 10.2 `[vite] http proxy error: /api/exec/smoke  Error: read ECONNRESET`
+
+```
+11:18:04 pm [vite] http proxy error: /api/exec/smoke
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+```
+
+`ECONNRESET` means the dev proxy opened a socket to `localhost:3001` and the API
+closed it without answering. Signing in does not call that route - only the
+instructor **Sandbox** card does - so this is a leftover request (a compile that
+was still running) meeting a backend that was not there:
+
+1. the API process had exited. A dropped database connection with no `error`
+   listener is an unhandled event, and Node exits; `node --watch` restarts it on
+   the next file change, which is why "it works the second time";
+2. `/api/exec/smoke` takes 10-20 s (a real call to onlinecompiler.io), so any
+   restart during it cuts the request mid-flight.
+
+What changed in the code: the pg pool now has an `error` listener and one retry,
+so a lost connection no longer kills the API; and the dev proxy prints one line
+with the target and the backend command, then answers the browser with a JSON
+`502 API_UNREACHABLE` instead of dying silently.
+
+If you still see it, the backend is simply not up:
+
+```bash
+cd backend && npm run db:check && npm run dev     # expect: Nyaywala API on http://localhost:3001
+```
+
+then press **Compile & run** again. When the API runs on the Windows side of WSL,
+point the proxy at it instead of fighting the boundary:
+
+```bash
+VITE_API_PROXY_TARGET=http://$(hostname).local:3001 npm run dev
+```

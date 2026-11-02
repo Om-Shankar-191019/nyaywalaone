@@ -46,6 +46,26 @@ const SCHEMA_ERROR_CODES = new Set(['P2021', 'P2022', 'P3005']);
 const CONNECTION_ERROR_CODES = new Set(['P1000', 'P1001', 'P1002', 'P1008', 'P1017']);
 
 /**
+ * Prisma 7 has no Rust query engine: it reaches Postgres through a driver
+ * adapter, and a failing *connector* surfaces as `PrismaClientKnownRequestError`
+ * with an **empty message** - the real cause sits in `meta` or `cause`. Logging
+ * `err.message` therefore printed a blank line and answered 500 with no clue,
+ * which is exactly the report we got from a fresh Linux clone. Flatten it.
+ */
+export function describePrismaError(error) {
+  const parts = [
+    error?.code ? `[${error.code}]` : '',
+    error?.message ?? '',
+    error?.meta ? JSON.stringify(error.meta).slice(0, 400) : '',
+    error?.cause?.message ?? '',
+  ].filter(Boolean);
+  return parts.join(' ').slice(0, 800) || '(no message, no meta, no cause)';
+}
+
+/** Text that means "we never got as far as the query", not "the route is wrong". */
+const CONNECTOR_FAILURE = /ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|timeout exceeded when trying to connect|Connection terminated|Can't reach database server|password authentication failed|self.signed certificate|unable to verify the first certificate|no pg_hba.conf entry/i;
+
+/**
  * A stable id per request, so the line in the log and the message on screen are
  * the same event. Without it "the failure has been logged" is a claim nobody can
  * follow up on.
@@ -106,6 +126,23 @@ export function errorHandler(err, req, res, next) {
 
   if (!config.isTest) {
     console.error('[error]', req.id, err?.stack ?? err);
+    if (String(err?.name ?? '').startsWith('Prisma')) {
+      console.error('[error:prisma]', req.id, describePrismaError(err));
+    }
+  }
+
+  // A Prisma error whose cause is a connector failure is an environment
+  // problem (wrong DATABASE_URL, paused database, blocked port), so it must not
+  // be reported as "something went wrong on our side".
+  if (String(err?.name ?? '').startsWith('Prisma') && CONNECTOR_FAILURE.test(describePrismaError(err))) {
+    return res.status(503).json({
+      error: {
+        code: 'DB_UNAVAILABLE',
+        message:
+          'The API could not reach the database. Check DATABASE_URL and that the database is awake; `cd backend && npm run db:check` names the failing step.',
+        details: { requestId: req.id, prismaCode: err.code ?? null },
+      },
+    });
   }
 
   return res.status(500).json({
