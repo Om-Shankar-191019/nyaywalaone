@@ -14,7 +14,7 @@ export function NotFound() {
         <div className="text-center">
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-muted">404</p>
           <h1 className="mt-2 text-2xl font-semibold text-fg">That page does not exist</h1>
-          <p className="mt-2 text-sm text-muted">The link may be outdated, or the page may arrive in a later week.</p>
+          <p className="mt-2 text-sm text-muted">The link may be outdated, or the page may have moved.</p>
           <div className="mt-6 flex justify-center gap-2">
             <LinkButton to="/">Home</LinkButton>
             <Link to="/login" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-fg">

@@ -65,7 +65,7 @@ export function Landing() {
       <main className="mx-auto max-w-6xl px-5">
         <section className="grid items-center gap-12 py-12 sm:py-16 lg:grid-cols-[1.5fr_1fr]">
           <div>
-            <Badge tone="brand">Week 2 · Grading engine</Badge>
+            <Badge tone="brand">Rule-driven grading engine</Badge>
             <h1 className="mt-4 max-w-2xl text-3xl font-semibold leading-[1.08] tracking-tight text-fg sm:text-5xl">
               Fair marks for C assignments, <span className="brand-gradient-text">the same way twice.</span>
             </h1>

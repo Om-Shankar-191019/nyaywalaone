@@ -21,7 +21,7 @@ const round6 = (value) => Math.round(value * 1e6) / 1e6;
  *  - the parameters are generated from each analyzer's own schema, so the form
  *    cannot offer a field the grader will reject;
  *  - publishing shows what changed, because "regrade and explain the difference"
- *    is the Week 3 exit criterion and an instructor cannot explain a v2 they
+ *    is a release criterion, and an instructor cannot explain a v2 they
  *    cannot see the diff of.
  */
 export function RulesPanel({ assignmentId, assignment, onChanged }) {

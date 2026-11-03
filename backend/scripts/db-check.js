@@ -17,6 +17,7 @@ import { lookup } from 'node:dns/promises';
 import net from 'node:net';
 import { config } from '../src/config.js';
 import { databaseTransport, prisma } from '../src/db.js';
+import { describeDbError } from '../src/lib/pg-pool.js';
 
 const ok = (label, detail) => console.log(`  OK    ${label.padEnd(17)} ${detail}`);
 const note = (label, detail) => console.log(`  NOTE  ${label.padEnd(17)} ${detail}`);
@@ -78,6 +79,50 @@ async function reach(host, port, timeoutMs = 6_000) {
   return { connected: false, reason: tried.join(', ') || 'no address resolved', tried };
 }
 
+/**
+ * The HTTPS transport is not "Postgres on 443": Neon's driver opens a WebSocket
+ * to wss://<host>/v2 and speaks Postgres inside it. A network that permits TLS
+ * on 443 but strips or resets the `Upgrade` handshake passes every TCP check and
+ * fails only at login - which is exactly the campus-Wi-Fi case this script
+ * exists for, and it is why "TCP 443 accepts connections" was not enough.
+ *
+ * Informational only: Neon may close an unauthenticated upgrade, so the LOGIN
+ * step stays the verdict and this line only explains it.
+ */
+function websocketProbe(host, timeoutMs = 8_000) {
+  if (typeof WebSocket !== 'function') {
+    return Promise.resolve({ supported: false, ok: false, reason: 'this Node build has no global WebSocket' });
+  }
+
+  return new Promise((resolve) => {
+    let socket;
+    try {
+      socket = new WebSocket(`wss://${host}/v2`);
+    } catch (error) {
+      resolve({ supported: true, ok: false, reason: error?.message ?? 'the upgrade could not be started' });
+      return;
+    }
+
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        socket.close();
+      } catch {
+        /* already closed */
+      }
+      resolve({ supported: true, ...result });
+    };
+
+    const timer = setTimeout(() => finish({ ok: false, reason: `no upgrade after ${timeoutMs} ms` }), timeoutMs);
+    socket.addEventListener('open', () => finish({ ok: true }));
+    socket.addEventListener('error', () => finish({ ok: false, reason: 'refused or dropped during the handshake' }));
+    socket.addEventListener('close', (event) => finish({ ok: false, reason: `closed during the handshake (code ${event.code})` }));
+  });
+}
+
 console.log('\nNyaywala - database check\n');
 
 /* ---------------------------------------------------------------- 1. env vars */
@@ -135,6 +180,9 @@ try {
 }
 
 /* ---------------------------------------------------------- 3. port reachability */
+/** Filled in only for the HTTPS transport; read again by the LOGIN hint below. */
+let wsUpgrade = null;
+
 if (!failed) {
   const secure = await reach(runtime.host, 443);
   const direct = await reach(runtime.host, 5432);
@@ -147,6 +195,13 @@ if (!failed) {
         `${runtime.host}:443 unreachable (${secure.reason})`,
         'HTTPS is blocked too, so this is not a port-5432 problem: wake the project, check Neon -> Settings -> IP Allow, or try another network.',
       );
+
+    if (secure.connected) {
+      wsUpgrade = await websocketProbe(runtime.host);
+      if (wsUpgrade.supported === false) note('WS 443', `not tested - ${wsUpgrade.reason}`);
+      else if (wsUpgrade.ok) ok('WS 443', `WebSocket upgrade to wss://${runtime.host}/v2 accepted (the path this transport needs)`);
+      else note('WS 443', `WebSocket upgrade ${wsUpgrade.reason} - informational, LOGIN below is the verdict`);
+    }
 
     if (direct.connected) note('TCP 5432', `${runtime.host}:5432 also works here - DATABASE_TRANSPORT=tcp would be faster`);
     if (secure.connected && !direct.connected) note('TCP 5432', 'blocked by this network, which is why DATABASE_TRANSPORT=https is set');
@@ -181,14 +236,19 @@ if (!failed) {
     ok('LOGIN', `authenticated as ${row.user} on ${row.database}`);
     console.log(`        ${String(row.version).split(' ').slice(0, 2).join(' ')}`);
   } catch (error) {
-    const detail = [error?.code, error?.message, error?.meta ? JSON.stringify(error.meta) : ''].filter(Boolean).join(' ');
-    fail(
-      'LOGIN',
-      detail || 'the driver returned an error with no message',
-      /password authentication failed/i.test(detail)
-        ? 'The password changed; copy both connection strings from Neon again.'
-        : 'See docs/linux-wsl.md section 10; the lines above name the failing layer.',
-    );
+    // `describeDbError` walks `cause` and the driver's aggregate errors. Reading
+    // only `error.message` is what produced "an error with no message": the
+    // HTTPS driver rejects with a wrapper whose own message is empty while the
+    // socket failure sits one level down.
+    const detail = describeDbError(error);
+    const hint = /password authentication failed/i.test(detail)
+      ? 'The password changed; copy both connection strings from Neon again.'
+      : databaseTransport === 'https'
+        ? wsUpgrade && wsUpgrade.supported !== false && !wsUpgrade.ok
+          ? 'This network accepts TLS on 443 but drops the WebSocket upgrade, so the HTTPS transport cannot work here. Port 5432 answers above, so set DATABASE_TRANSPORT=tcp (or remove the line) in backend/.env and run this again.'
+          : 'The HTTPS transport reached 443 but could not finish a query. If 5432 answers above, set DATABASE_TRANSPORT=tcp; otherwise try another network. See docs/linux-wsl.md section 10.4.'
+        : 'See docs/linux-wsl.md section 10; the lines above name the failing layer.';
+    fail('LOGIN', detail, hint);
   }
 }
 

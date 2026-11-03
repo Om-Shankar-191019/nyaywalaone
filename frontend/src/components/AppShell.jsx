@@ -56,9 +56,9 @@ export function AppShell() {
         </nav>
 
         <div className="mt-auto rounded-xl border border-line bg-surface-2 p-3">
-          <Badge tone="brand">Week 2</Badge>
+          <Badge tone="brand">Grading engine</Badge>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            Grading engine: weighted rules, per-metric evidence and a hashed report you can reproduce.
+            Weighted rules, per-metric evidence and a hashed report you can reproduce.
           </p>
         </div>
       </aside>
