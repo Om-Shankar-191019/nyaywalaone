@@ -64,7 +64,10 @@ systemRouter.get(
         // The columns added in Week 4. A deployment that skipped the migration
         // answers every submit with a 500 until this is fixed.
         const rows = await prisma.$queryRawUnsafe(
-          `SELECT column_name FROM information_schema.columns
+          // `column_name` is Postgres' internal `name` type; cast it so the
+          // HTTPS transport (which cannot deserialize `name`) reports schema
+          // health the same way the TCP transport does.
+          `SELECT column_name::text AS column_name FROM information_schema.columns
              WHERE table_name = 'evaluations' AND column_name IN ('claimed_at', 'attempt_count', 'stage')`,
         );
         const present = new Set(rows.map((row) => row.column_name));

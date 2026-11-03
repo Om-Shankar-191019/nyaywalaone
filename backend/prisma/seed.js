@@ -1,8 +1,6 @@
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.js';
 import bcrypt from 'bcryptjs';
-import { createPool, waitForDatabase } from '../src/lib/pg-pool.js';
+import { createDatabase, resolveTransport, waitForConnection } from '../src/lib/db-adapter.js';
 import { describePrismaError } from '../src/lib/prisma-errors.js';
 import { defaultRules, resolveRules } from '../src/grading/rules.js';
 import { rulesHash } from '../src/grading/canonical.js';
@@ -10,12 +8,16 @@ import { rulesHash } from '../src/grading/canonical.js';
 // Prisma 7 needs a driver adapter; the seed is standalone so it can run
 // without the full app environment (no ACCESS_TOKEN_SECRET required).
 //
-// It uses the API's pool settings (src/lib/pg-pool.js) because the seed is the
-// first command a fresh clone runs, and therefore the first thing to meet a
-// cold Neon compute. Without the connect retries it dies with an empty Prisma
-// message: `Seed failed:` and nothing else.
-const pool = createPool(process.env.DATABASE_URL);
-const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+// It uses the API's transport and pool settings (src/lib/db-adapter.js) because
+// the seed is the first command a fresh clone runs, and therefore the first
+// thing to meet a cold Neon compute, and because on a network that drops port
+// 5432 the seed has to use the same HTTPS fallback as the API. Without the
+// connect retries it dies with an empty Prisma message: `Seed failed:` and
+// nothing else.
+const { prisma, pool } = createDatabase({
+  connectionString: process.env.DATABASE_URL,
+  transport: resolveTransport(process.env.DATABASE_TRANSPORT),
+});
 
 const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'Passw0rd-Demo-2026';
 const INSTRUCTOR_EMAIL = 'prof@example.edu';
@@ -37,10 +39,11 @@ const STUDENTS = [
  * password that someone already changed.
  */
 async function main() {
-  const reachable = await waitForDatabase(pool);
+  const reachable = await waitForConnection({ prisma, pool });
   if (!reachable.ok) {
     console.error('Cannot reach the database:', describePrismaError(reachable.error));
     console.error('Run `npm run db:check` to see which step fails (env, DNS, TCP, login, schema), then retry.');
+    console.error('If it reports that port 5432 is blocked, set DATABASE_TRANSPORT=https in backend/.env and run it again.');
     process.exitCode = 1;
     return;
   }
@@ -160,5 +163,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect().catch(() => {});
-    await pool.end().catch(() => {});
+    await pool?.end().catch(() => {});
   });

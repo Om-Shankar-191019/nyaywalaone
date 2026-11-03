@@ -1,39 +1,52 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from './generated/prisma/client.js';
 import { config } from './config.js';
-import { createPool, waitForDatabase } from './lib/pg-pool.js';
+import { createDatabase, resolveTransport, waitForConnection } from './lib/db-adapter.js';
 
 /**
- * Prisma 7 is Rust-free: the client borrows connections from a `pg` pool, so
- * the connection string is passed here rather than read from `schema.prisma`,
- * and the pool itself is ours to configure. See src/lib/pg-pool.js for why the
- * timeouts, keepalive and retries are what they are.
+ * Prisma 7 is Rust-free: the client borrows connections from a driver adapter,
+ * so the connection string is passed here rather than read from
+ * `schema.prisma`, and the transport itself is ours to configure.
+ *
+ *  - DATABASE_TRANSPORT=tcp (default) borrows from the `pg` pool configured in
+ *    src/lib/pg-pool.js - timeouts, keepalive and connect retries live there.
+ *  - DATABASE_TRANSPORT=https uses Neon's serverless driver over 443, which is
+ *    the working path on a network that drops outbound 5432.
  *
  * `DATABASE_URL` must be the pooled host (Neon pgbouncer); migrations use
  * `DIRECT_URL` through prisma.config.ts.
  */
-const pool = createPool(config.DATABASE_URL, { max: config.isTest ? 4 : 10 });
-
-const adapter = new PrismaPg(pool);
-
 const globalForPrisma = globalThis;
+
+const log = config.isProd ? ['error'] : ['error', 'warn'];
 
 /**
  * One client per process. On Vercel the module stays warm between invocations,
  * so a client per request would exhaust the pool.
  */
-export const prisma =
-  globalForPrisma.__nyaywalaPrisma ??
-  new PrismaClient({
-    adapter,
-    log: config.isProd ? ['error'] : ['error', 'warn'],
+const existing = globalForPrisma.__nyaywalaPrisma;
+
+let prisma = existing;
+let pool = globalForPrisma.__nyaywalaPool ?? null;
+
+if (!prisma) {
+  const created = createDatabase({
+    connectionString: config.DATABASE_URL,
+    transport: config.DATABASE_TRANSPORT,
+    max: config.isTest ? 4 : 10,
+    log,
   });
+  prisma = created.prisma;
+  pool = created.pool;
+}
 
 if (!config.isProd) {
   globalForPrisma.__nyaywalaPrisma = prisma;
+  globalForPrisma.__nyaywalaPool = pool;
 }
 
-export { pool };
+export { pool, prisma };
+
+/** The transport in force, for logs and `db:check`. */
+export const databaseTransport = resolveTransport(config.DATABASE_TRANSPORT);
 
 export async function pingDatabase() {
   await prisma.$queryRaw`SELECT 1`;
@@ -46,5 +59,5 @@ export async function pingDatabase() {
  * startup instead of as a 503 in the middle of a sign-in.
  */
 export function warmDatabase() {
-  return waitForDatabase(pool);
+  return waitForConnection({ prisma, pool });
 }

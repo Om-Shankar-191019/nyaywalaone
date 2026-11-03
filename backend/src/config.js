@@ -51,6 +51,12 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required (pooled Postgres connection string)'),
   DIRECT_URL: z.string().min(1, 'DIRECT_URL is required (direct Postgres connection string, used by migrations)'),
+  // `tcp` = Postgres on 5432 (default). `https` = Neon's serverless driver over
+  // 443, for networks that drop outbound 5432. See src/lib/db-adapter.js.
+  DATABASE_TRANSPORT: z.preprocess(
+    (value) => (value === '' || value === undefined ? undefined : String(value).trim().toLowerCase()),
+    z.enum(['tcp', 'https']).default('tcp'),
+  ),
   TEST_DATABASE_URL: z.string().optional().default(''),
   TEST_DIRECT_URL: z.string().optional().default(''),
 

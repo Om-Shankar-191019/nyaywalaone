@@ -55,7 +55,10 @@ export function errorChain(error, seen = new Set()) {
 export function isConnectFailure(error) {
   return errorChain(error).some((inner) => {
     if (TRANSIENT_CODES.has(inner?.code)) return true;
-    return /timeout exceeded when trying to connect|Connection terminated due to connection timeout|Connection terminated unexpectedly/i.test(
+    // Messages, because not every layer gives us a code: `pg` wraps a failed
+    // connect in an AggregateError, and the HTTPS transport (Neon's serverless
+    // driver) reports a broker problem as a WebSocket or fetch error.
+    return /timeout exceeded when trying to connect|Connection terminated due to connection timeout|Connection terminated unexpectedly|websocket|fetch failed|network is unreachable/i.test(
       String(inner?.message ?? ''),
     );
   });

@@ -305,10 +305,65 @@ npm run db:check          # DNS and TCP lines name the failing step
   `[network]\ngenerateResolvConf = false` to `/etc/wsl.conf`, write
   `nameserver 1.1.1.1` into `/etc/resolv.conf`, then `wsl --shutdown` from Windows
   and reopen.
-- `OK DNS`, `FAIL TCP`: a VPN, campus firewall or proxy is dropping 5432. Try
-  another network, or move the database closer (pick the Neon region nearest
-  you and re-create the project there - the URL changes with it).
+- `OK DNS`, `FAIL TCP 5432` but `OK TCP 443`: your network drops outbound
+  Postgres. Do not retry and do not move the database - set
+  `DATABASE_TRANSPORT=https` instead, see [10.4](#104-fail-tcp-5432--the-network-blocks-postgres-use-the-https-transport).
+- `FAIL` on both 443 and 5432: not a port problem. Wake the Neon project, check
+  Neon -> Settings -> IP Allow, or try another network.
 - both `OK` but requests still stall for seconds: you are far from the region.
   Latency to the pooler is the whole cost of the first query; a closer region
   fixes it, and everything in the app is a single round trip away from being fast.
 - `FAIL SCHEMA` after a successful login: `npm run db:deploy && npm run db:seed`.
+
+### 10.4 `FAIL TCP 5432` - the network blocks Postgres, use the HTTPS transport
+
+```
+  OK    DNS         ep-green-credit-b4uibrl8-pooler... -> 52.14.39.200
+  FAIL  TCP 5432    ep-green-credit-b4uibrl8-pooler...:5432 unreachable (timed out after 6000 ms)
+  OK    TCP 443     ep-green-credit-b4uibrl8-pooler...:443 accepts connections
+```
+
+Read those three lines together, because each one rules a cause out. The name
+resolves, so DNS is fine. Port 443 on the *same host* answers, so the Neon
+project is awake and reachable and there is no IP restriction. Only 5432 is
+being dropped - normally the campus, hostel or office Wi-Fi, occasionally the
+ISP. No amount of retrying, reconnecting or re-copying the URL helps: the SYN
+never leaves the network.
+
+Windows on another network working while a Linux laptop fails is the usual way
+this shows up. It is not a Linux bug and the database is not down.
+
+**The fix - one line, no new accounts:**
+
+```bash
+# backend/.env
+DATABASE_TRANSPORT=https
+```
+
+```bash
+cd backend
+npm run db:check     # now checks 443 instead of 5432
+npm run db:seed      # same seed, over 443
+npm run dev          # [db] pool warm after 1 attempt(s)
+```
+
+That switches Prisma to Neon's serverless driver (`@prisma/adapter-neon`),
+which tunnels Postgres inside a TLS WebSocket on port 443 - the same port as
+every web page, so filters that allow browsing allow this. Everything the app
+does keeps working, including `$transaction`: sessions, joining a course,
+grading and the submission queue.
+
+Trade-offs, so you know what you are choosing:
+
+- a little more latency per query than raw 5432 - fine on a LAN, invisible
+  behind a university firewall where the alternative is nothing;
+- `npm run db:deploy` (migrations) still needs `DIRECT_URL` on 5432. Run
+  migrations from a network that allows 5432, or from Windows, then use the
+  app over 443 with the schema already in place. `DATABASE_TRANSPORT` only
+  changes how the *application* queries, never the schema;
+- use the `-pooler` host in `DATABASE_URL`, as before. The direct host has no
+  WebSocket endpoint.
+
+If you prefer the plain TCP path, run the app on a network that permits 5432
+(a phone hotspot usually does) - and remember to remove the line again, since
+`tcp` is faster when it works.
