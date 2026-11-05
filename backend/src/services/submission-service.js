@@ -215,6 +215,57 @@ export function scheduleGrading(evaluationId) {
   return task;
 }
 
+/** A row that has not moved for this long was orphaned, not slow. */
+export const STALL_AFTER_MS = 90_000;
+
+/** How many times a stalled row may be restarted before it is failed loudly. */
+const MAX_RESCUES = 3;
+
+/**
+ * Restart grading for a row nothing is working on any more.
+ *
+ * A submission is graded in the request process, so a restart, a crashed
+ * worker or a killed dev server leaves the row `RUNNING` forever: the student
+ * polls, sees "grading", clicks check again, and sees "grading" again with
+ * nothing behind it. A poll for a row that is old and not in flight here is
+ * exactly the moment to pick the work back up (the persist step is idempotent,
+ * so a second run rewrites the same rows).
+ */
+export async function resumeStalledGrading(evaluation) {
+  if (!evaluation || !['QUEUED', 'RUNNING'].includes(evaluation.status)) return false;
+  if (inFlight.has(evaluation.id)) return false;
+
+  const cutoff = new Date(Date.now() - STALL_AFTER_MS);
+  const since = evaluation.claimedAt ?? evaluation.startedAt ?? evaluation.createdAt;
+  if (!since || new Date(since) > cutoff) return false;
+
+  if ((evaluation.attemptCount ?? 0) >= MAX_RESCUES) {
+    // It keeps dying; say so instead of spinning forever.
+    await prisma.evaluation.updateMany({
+      where: { id: evaluation.id, status: { in: ['QUEUED', 'RUNNING'] } },
+      data: { status: 'FAILED', stage: 'failed', failedReason: 'grading_stalled', finishedAt: new Date() },
+    });
+    return false;
+  }
+
+  // Claim the rescue atomically so two polls cannot both restart the same run.
+  const claimed = await prisma.evaluation.updateMany({
+    where: {
+      id: evaluation.id,
+      status: { in: ['QUEUED', 'RUNNING'] },
+      OR: [
+        { claimedAt: { lt: cutoff } },
+        { claimedAt: null, startedAt: { lt: cutoff } },
+      ],
+    },
+    data: { claimedAt: new Date(), attemptCount: { increment: 1 } },
+  });
+  if (claimed.count === 0) return false;
+
+  scheduleGrading(evaluation.id);
+  return true;
+}
+
 /** Wait for the in-process task, if there is one. Used by scripts and tests. */
 export const gradingDone = (evaluationId) => inFlight.get(evaluationId) ?? Promise.resolve(null);
 

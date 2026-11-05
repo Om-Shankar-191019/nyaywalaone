@@ -25,6 +25,9 @@
     "exec:taxonomy": "node scripts/exec-taxonomy.js",
     "exec:smoke": "node scripts/smoke.js",
     "exec:check": "node scripts/provider-check.js",
+    "llm:check": "node scripts/llm-check.js",
+    "rules:upgrade": "node scripts/rules-upgrade.js",
+    "llm:smoke": "node scripts/llm-smoke.js",
     "db:setup-test": "node scripts/setup-test-db.js"
   },
   "dependencies": {

@@ -3,12 +3,16 @@ import { ArrowLeft, Download, FileJson, Printer, ShieldAlert, ShieldCheck } from
 import { Link, useParams } from 'react-router';
 import { api } from '../../api/client.js';
 import { useAuth } from '../../auth/AuthProvider.jsx';
+import { LlmPanel } from '../../components/llm-panel.jsx';
 import { CopyButton, DiffView, SuggestionList } from '../../components/report-parts.jsx';
 import { ErrorState } from '../../components/states.jsx';
 import { Alert, Badge, Button, Card, CardHeader, LinkButton, PageHeader } from '../../components/ui.jsx';
 
 const statusTone = (status) =>
   status === 'ok' ? 'success' : status === 'partial' ? 'warning' : status === 'unavailable' ? 'neutral' : 'danger';
+
+/** "unavailable" on an advisory metric means "did not run", not "failed". */
+const statusLabel = (status) => (status === 'unavailable' ? 'not run' : status);
 
 const gradeTone = (percent) => (percent >= 75 ? 'success' : percent >= 50 ? 'warning' : 'danger');
 
@@ -149,7 +153,7 @@ export function StudentReport() {
                         <td className="px-3 py-2.5 font-mono text-xs text-muted">{(metric.weight * 100).toFixed(1)}%</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-fg">{(metric.contribution / 100).toFixed(2)}</td>
                         <td className="px-4 py-2.5">
-                          <Badge tone={statusTone(metric.status)}>{metric.status}</Badge>
+                          <Badge tone={statusTone(metric.status)}>{statusLabel(metric.status)}</Badge>
                         </td>
                       </tr>
                     ))}
@@ -171,6 +175,8 @@ export function StudentReport() {
               <CardHeader title="What to fix" description="One line per distinct issue, tied to the metric that raised it." />
               <SuggestionList metrics={report.metrics} />
             </Card>
+
+            <LlmPanel llm={report.llm} recovery={report.recovery} />
 
             {failing.length ? (
               <Card>
@@ -240,15 +246,15 @@ export function StudentReport() {
               />
               <div className="space-y-3 px-5 py-4 text-xs">
                 <div className="flex items-start gap-2">
-                  {payload?.verified ? (
+                  {payload?.verified === true ? (
                     <ShieldCheck aria-hidden="true" size={16} className="mt-0.5 text-success" />
                   ) : (
                     <ShieldAlert aria-hidden="true" size={16} className="mt-0.5 text-warning" />
                   )}
                   <p className="text-muted">
-                    {payload?.verified
+                    {payload?.verified === true
                       ? 'Hash verified: recomputing the report from stored evidence gives the stored hash.'
-                      : 'Hash could not be verified against the stored value.'}
+                      : (payload?.verification_note ?? 'Hash could not be verified against the stored value.')}
                   </p>
                 </div>
 

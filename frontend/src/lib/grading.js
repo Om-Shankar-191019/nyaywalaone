@@ -51,7 +51,8 @@ export const STAGE_DETAIL = {
 
 const FIRST_DELAY_MS = 1500;
 const MAX_DELAY_MS = 5000;
-const GIVE_UP_AFTER_MS = 90_000;
+/** After this long we say "still grading" - but we never stop asking. */
+const SLOW_AFTER_MS = 25_000;
 const BACKOFF = 1.35;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -62,7 +63,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Three rules from the plan are enforced here rather than in the component:
  *  - the delay starts at 1.5 s and backs off to 5 s, so a fast grade still feels
  *    immediate without hammering the API;
- *  - after 90 s it stops and says "still running" instead of spinning forever;
+ *  - it never gives up. After 25 s it says "still grading" and keeps asking,
+ *    because a message you cannot get past is worse than a spinner that ends;
  *  - `cancel()` sets a flag that every await re-checks, so no request outlives
  *    the component or a cancelled submit.
  */
@@ -73,6 +75,7 @@ export function useGradingPoll() {
     status: null,
     stage: null,
     elapsedMs: 0,
+    slow: false,
     timedOut: false,
     data: null,
     error: null,
@@ -100,6 +103,9 @@ export function useGradingPoll() {
 
   const run = useCallback(
     async (submissionId) => {
+      // One poll at a time: a second "check again" must not leave the first loop
+      // running, or the two loops apply their state out of order.
+      control.current.cancelled = true;
       const token = { cancelled: false };
       control.current = token;
       const startedAt = Date.now();
@@ -111,6 +117,7 @@ export function useGradingPoll() {
         status: 'QUEUED',
         stage: 'queued',
         elapsedMs: 0,
+        slow: false,
         timedOut: false,
         error: null,
       });
@@ -128,22 +135,18 @@ export function useGradingPoll() {
           const stage = evaluation?.stage ?? 'queued';
           const elapsedMs = Date.now() - startedAt;
           const finished = ['SUCCEEDED', 'PARTIAL', 'FAILED'].includes(status);
+          const slow = elapsedMs >= SLOW_AFTER_MS;
 
-          apply({ data, status, stage, elapsedMs, running: !finished });
+          apply({ data, status, stage, elapsedMs, running: !finished, slow, timedOut: slow && !finished });
 
           if (finished) {
             token.cancelled = true;
             return;
           }
 
-          if (elapsedMs >= GIVE_UP_AFTER_MS) {
-            // Not an error: grading may legitimately be slow. Stop asking and
-            // hand the student a button instead.
-            token.cancelled = true;
-            apply({ running: false, timedOut: true });
-            return;
-          }
-
+          // Keep asking. A grade is a compile, a handful of analyzers and a few
+          // model calls; a fixed deadline only produced a message the student
+          // could not get past.
           delay = Math.min(MAX_DELAY_MS, Math.round(delay * BACKOFF));
         } catch (error) {
           if (token.cancelled) return;

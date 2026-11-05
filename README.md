@@ -286,6 +286,35 @@ local compiler, no build step for the backend.
 
 ---
 
+### Optional: the language-model checks
+
+Four checks use a free language-model API: written feedback built from the
+metrics, a readability rubric (naming, formatting, comments, structure, error
+handling), copy-paste signals for AI or tutorial code, and compile-error recovery
+that can award capped marks when the logic is right but the file does not compile.
+They are weight 0 in the shipped rule sets and never move a mark on their own;
+the recovery credit is reported separately. See [docs/llm.md](docs/llm.md).
+
+```bash
+cd backend
+npm run llm:check     # which provider answers from this machine; one tiny call each
+```
+
+Only one key is needed, and every provider below is free:
+
+| Provider | Env var | Where to get a key |
+|---|---|---|
+| Groq | `GROQ_API_KEY` | https://console.groq.com/keys |
+| Google Gemini | `GEMINI_API_KEY` | https://aistudio.google.com/apikey |
+| OpenRouter | `OPENROUTER_API_KEY` | https://openrouter.ai/keys (`:free` models) |
+| Cerebras | `CEREBRAS_API_KEY` | https://cloud.cerebras.ai |
+| Mistral | `MISTRAL_API_KEY` | https://console.mistral.ai/api-keys |
+
+Without a key everything still works: the checks show as *not run* and the grade
+is unaffected. If an assignment was published before these checks existed, run
+`npm run rules:upgrade -- --apply` to publish a new rule-set version that adds
+them (weights are untouched).
+
 ## 5. When it does not start
 
 **`[vite] cannot reach the API at http://localhost:3001 (ECONNRESET)`**

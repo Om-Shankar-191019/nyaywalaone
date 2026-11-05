@@ -47,8 +47,16 @@ const ruleSelection = String(argv.rules ?? 'default,strict,complexity')
   .map((name) => name.trim())
   .filter(Boolean);
 
-// Must happen before `config.js` is imported: the analyzer reads the key once.
-if (!llmEnabled) process.env.GROQ_API_KEY = '';
+// Must happen before `config.js` is imported. Clearing every provider, not just
+// Groq: a determinism grid must not depend on which free tier answered.
+if (!llmEnabled) {
+  process.env.GROQ_API_KEY = '';
+  process.env.GEMINI_API_KEY = '';
+  process.env.OPENROUTER_API_KEY = '';
+  process.env.CEREBRAS_API_KEY = '';
+  process.env.MISTRAL_API_KEY = '';
+  process.env.LLM_ENABLED = 'false';
+}
 // The grid is provider-bound, not CPU-bound: analyzers run with the normal
 // grading concurrency and the provider limiter (2 in flight on onlinecompiler)
 // decides the real width.

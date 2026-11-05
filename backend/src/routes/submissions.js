@@ -16,6 +16,7 @@ import {
   createSubmissionRecord,
   latestEvaluation,
   loadSubmissionForViewer,
+  resumeStalledGrading,
   scheduleGrading,
   serialiseSubmission,
 } from '../services/submission-service.js';
@@ -103,7 +104,10 @@ submissionsRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { submission, assignment, viewer } = await loadSubmissionForViewer(assertUuid(req.params.id), req.user);
-    const evaluation = await latestEvaluation(submission.id);
+    let evaluation = await latestEvaluation(submission.id);
+    // A poll is also the moment to notice a run that died before writing its
+    // report: restart it here rather than showing "grading" forever.
+    if (await resumeStalledGrading(evaluation)) evaluation = await latestEvaluation(submission.id);
     const includeGrade = canSeeReport(assignment, submission, req.user);
     return send(res, {
       viewer,

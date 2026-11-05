@@ -244,12 +244,12 @@ export function StudentAssignment() {
 
                 {poll.timedOut && !TERMINAL.has(poll.status) ? (
                   <Alert tone="warning" title="Still grading">
-                    This is taking longer than usual, so we stopped asking. Grading continues on the server - check again in a
-                    moment.
+                    It is slower than usual - the readability and originality checks ask a language model, which can take a few
+                    extra seconds. Nothing is stuck: this page keeps checking and the report appears here on its own.
                     <div className="mt-3">
                       <Button variant="secondary" size="sm" onClick={poll.refresh}>
                         <RefreshCw aria-hidden="true" size={14} />
-                        Check again
+                        Check again now
                       </Button>
                     </div>
                   </Alert>

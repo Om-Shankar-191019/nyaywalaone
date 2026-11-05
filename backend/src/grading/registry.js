@@ -8,6 +8,10 @@ import { memoryAuditAnalyzer } from './analyzers/memory-audit.js';
 import { styleAnalyzer } from './analyzers/style.js';
 import { similarityAnalyzer } from './analyzers/similarity.js';
 import { llmReviewAnalyzer } from './analyzers/llm-review.js';
+import { llmFeedbackAnalyzer } from './analyzers/llm-feedback.js';
+import { llmStyleAnalyzer } from './analyzers/llm-style.js';
+import { llmPlagiarismAnalyzer } from './analyzers/llm-originality.js';
+import { llmCompileRecoveryAnalyzer } from './analyzers/llm-compile-recovery.js';
 
 /**
  * The analyzer registry. A rule set names an analyzer; if the name is not here,
@@ -24,6 +28,10 @@ const ANALYZERS = [
   styleAnalyzer,
   similarityAnalyzer,
   llmReviewAnalyzer,
+  llmFeedbackAnalyzer,
+  llmStyleAnalyzer,
+  llmPlagiarismAnalyzer,
+  llmCompileRecoveryAnalyzer,
 ];
 
 const byName = new Map(ANALYZERS.map((analyzer) => [analyzer.name, analyzer]));

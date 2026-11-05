@@ -152,6 +152,37 @@ function failureMetric(rule, reason) {
   };
 }
 
+/**
+ * Marks for a program that never ran.
+ *
+ * The credit is added to the grade rather than folded into a weight, because
+ * every metric that carries weight is `unavailable` on a compile error. The
+ * analyzer produces a 0-1 confidence and the rule's `max_credit` caps it, so a
+ * confidently-read program can recover at most 40% by default. Returns null
+ * when the rule set has no recovery metric, so nothing changes for rule sets
+ * that do not want this.
+ */
+export function recoveryCreditFor({ metrics, rules }) {
+  const metric = metrics.find((item) => item.analyzer === 'llm_compile_recovery');
+  if (!metric || metric.status === 'unavailable' || metric.status === 'error') return null;
+  const rule = rules.metrics.find((item) => item.analyzer === 'llm_compile_recovery');
+  const maxCredit = Math.min(0.6, Math.max(0, Number(rule?.params?.max_credit ?? 0.4)));
+  const logicSound = Boolean(metric.evidence?.logic_sound);
+  const confidence = clamp01(Number(metric.evidence?.confidence ?? metric.score ?? 0));
+  const awarded = logicSound ? Math.round(confidence * maxCredit * 10_000) : 0;
+  return {
+    logic_sound: logicSound,
+    confidence: Math.round(confidence * 1000) / 1000,
+    max_credit: maxCredit,
+    awarded_hundredths: awarded,
+    errors: Array.isArray(metric.evidence?.errors) ? metric.evidence.errors.slice(0, 6) : [],
+    explanation: String(metric.evidence?.summary ?? metric.feedback ?? '').slice(0, 1200),
+    corrected_source: typeof metric.evidence?.corrected_source === 'string' ? metric.evidence.corrected_source : null,
+    provider: metric.evidence?.provider ?? null,
+    model: metric.evidence?.model ?? null,
+  };
+}
+
 async function loadEvaluation(evaluationId) {
   return prisma.evaluation.findUnique({
     where: { id: evaluationId },
@@ -272,6 +303,7 @@ export async function runEvaluation(evaluationId) {
     corpus,
     provider,
     allowNoOracle: assignment.allowNoOracle,
+    assignmentTitle: assignment.title,
     archiveCount,
     flags: {},
   };
@@ -312,6 +344,52 @@ export async function runEvaluation(evaluationId) {
   const compileFailed =
     gate.status.code === 'COMPILATION_ERROR' || /(^|\n)[^\n]*\berror:/.test(String(gate.compileOutput ?? ''));
 
+  ctx.compileOutput = String(gate.compileOutput ?? '');
+
+  /**
+   * One rule, one metric row. Lifted out of the success branch because the
+   * compile-failure branch now runs analyzers too: a language model can read a
+   * program that never compiled, and that is exactly when a student needs it.
+   */
+  const runRule = async (rule) => {
+    const base = { name: rule.name, analyzer: rule.analyzer, weight: rule.weight };
+    const analyzer = registry.get(rule.analyzer);
+    if (!analyzer) {
+      return { ...base, score: 0, status: 'error', evidence: { reason: 'analyzer_missing' }, feedback: 'This metric could not run: the analyzer is not registered.' };
+    }
+    // A submission that already hit the time limit is not re-run for edge cases.
+    if (ctx.flags.suspected_infinite_loop && ['edge_case_runner', 'memory_audit'].includes(rule.analyzer)) {
+      return {
+        ...base,
+        score: 0,
+        status: 'unavailable',
+        evidence: { reason: 'skipped_after_time_limit' },
+        feedback: 'Skipped because an earlier test exceeded its time limit.',
+      };
+    }
+
+    try {
+      const outcome = await withTimeout(analyzer.run(ctx, rule.params), ANALYZER_TIMEOUT_MS, rule.analyzer);
+      if (outcome?.evidence?.suspected_infinite_loop) ctx.flags.suspected_infinite_loop = true;
+      return {
+        ...base,
+        score: Number.isFinite(outcome?.score) ? outcome.score : 0,
+        status: outcome?.status ?? 'ok',
+        evidence: outcome?.evidence ?? {},
+        feedback: String(outcome?.feedback ?? ''),
+      };
+    } catch (error) {
+      if (error instanceof AppError && error.status === 429) throw error;
+      return {
+        ...base,
+        score: 0,
+        status: 'error',
+        evidence: { reason: String(error.message ?? error).slice(0, 300) },
+        feedback: `The ${rule.name} check could not complete, so it is reported as unavailable rather than as a zero.`,
+      };
+    }
+  };
+
   if (compileFailed) {
     partial = true;
     failedReason = 'compile_error';
@@ -321,57 +399,65 @@ export async function runEvaluation(evaluationId) {
           ...failureMetric(rule, 'compile_error'),
           status: 'ok',
           score: 0,
-          evidence: { compile_errors: (gate.compileOutput ?? '').split('\n').filter(Boolean).length, compile_output: String(gate.compileOutput ?? '').slice(0, 4000) },
+          evidence: { compile_errors: ctx.compileOutput.split('\n').filter(Boolean).length, compile_output: ctx.compileOutput.slice(0, 4000) },
           feedback: 'The program does not compile, so nothing could be measured.',
         };
       }
       return failureMetric(rule, 'compile_error');
     });
+
+    // Only analyzers that opt in run without a compiled binary: the recovery
+    // review, plus the two that read text alone (readability and originality).
+    // Everything else has already been reported as unavailable, which is the
+    // honest answer.
+    ctx.metrics = results.map((metric) => ({ ...metric, contribution: 0 }));
+    const recoveryRules = rules.metrics.filter((rule) => {
+      const analyzer = registry.get(rule.analyzer);
+      return Boolean(analyzer?.onCompileFailure || analyzer?.runsWithoutBinary);
+    });
+    if (recoveryRules.length) {
+      // Replace the placeholder row, never append: the rule set already named
+      // this metric, and metric_results is unique on (evaluation, name).
+      const done = new Map(results.map((row) => [row.name, row]));
+      // Same two-at-a-time rule as the normal pass: three text reviews on a file
+      // that never compiled should not add 15 s of waiting.
+      const rows = await mapLimit(recoveryRules, 2, runRule);
+      for (const row of rows) done.set(row.name, row);
+      results = rules.metrics.map((rule) => done.get(rule.name)).filter(Boolean);
+    }
   } else {
     // The program compiled. Its exit status on empty stdin is the analyzers'
     // business, not the gate's.
     await setStage('analyzing');
-    results = await mapLimit(rules.metrics, config.GRADING_CONCURRENCY, async (rule) => {
-      const base = { name: rule.name, analyzer: rule.analyzer, weight: rule.weight };
-      const analyzer = registry.get(rule.analyzer);
-      if (!analyzer) {
-        return { ...base, score: 0, status: 'error', evidence: { reason: 'analyzer_missing' }, feedback: 'This metric could not run: the analyzer is not registered.' };
-      }
-      // A submission that already hit the time limit is not re-run for edge cases.
-      if (ctx.flags.suspected_infinite_loop && ['edge_case_runner', 'memory_audit'].includes(rule.analyzer)) {
-        return {
-          ...base,
-          score: 0,
-          status: 'unavailable',
-          evidence: { reason: 'skipped_after_time_limit' },
-          feedback: 'Skipped because an earlier test exceeded its time limit.',
-        };
-      }
+    // Deferred analyzers need the marks, so they run in a second pass. Running
+    // them in the first pass as well would duplicate their rows; running the
+    // second pass sequentially keeps four model calls from arriving at a free
+    // tier as a burst.
+    const deferred = rules.metrics.filter((rule) => registry.get(rule.analyzer)?.needsMetrics);
+    const immediate = rules.metrics.filter((rule) => !deferred.includes(rule));
+    results = await mapLimit(immediate, config.GRADING_CONCURRENCY, runRule);
 
-      try {
-        const outcome = await withTimeout(analyzer.run(ctx, rule.params), ANALYZER_TIMEOUT_MS, rule.analyzer);
-        if (outcome?.evidence?.suspected_infinite_loop) ctx.flags.suspected_infinite_loop = true;
-        return {
-          ...base,
-          score: Number.isFinite(outcome?.score) ? outcome.score : 0,
-          status: outcome?.status ?? 'ok',
-          evidence: outcome?.evidence ?? {},
-          feedback: String(outcome?.feedback ?? ''),
-        };
-      } catch (error) {
-        if (error instanceof AppError && error.status === 429) throw error;
-        return {
-          ...base,
-          score: 0,
-          status: 'error',
-          evidence: { reason: String(error.message ?? error).slice(0, 300) },
-          feedback: `The ${rule.name} check could not complete, so it is reported as unavailable rather than as a zero.`,
-        };
-      }
-    });
+    if (deferred.length) {
+      ctx.metrics = results.map((metric) => ({
+        ...metric,
+        contribution: contributionOf(metric.score ?? 0, metric.weight ?? 0),
+      }));
+      const done = new Map(results.map((row) => [row.name, row]));
+      // Two at a time: the client's own semaphore caps concurrency anyway, and
+      // sequential made a grade wait ~6 s per analyzer. This is the difference
+      // between a 12 s report and a spinner long enough to look broken.
+      const rows = await mapLimit(deferred, 2, runRule);
+      for (const row of rows) done.set(row.name, row);
+      results = rules.metrics.map((rule) => done.get(rule.name)).filter(Boolean);
+    }
   }
 
-  const { metrics, gradeHundredths } = scoreMetrics(results, rules.on_unavailable);
+  const scored = scoreMetrics(results, rules.on_unavailable);
+  const { metrics } = scored;
+  // Recovery credit is added on top, never by re-weighting the metrics that
+  // could not run: a compile error must still cost most of the grade.
+  const recovery = compileFailed ? recoveryCreditFor({ metrics, rules }) : null;
+  const gradeHundredths = Math.min(10_000, scored.gradeHundredths + (recovery?.awarded_hundredths ?? 0));
   // `partial` is a legitimate result with a caveat; only missing evidence
   // (unavailable/error) makes the whole evaluation PARTIAL. A zero-weight
   // metric cannot, because it cannot move the grade: an unavailable advisory
@@ -415,13 +501,20 @@ export async function runEvaluation(evaluationId) {
     partial,
     failedReason,
     capabilities,
+    recovery,
   });
 
-  await prisma.$transaction([
-    prisma.metricResult.deleteMany({ where: { evaluationId: evaluation.id } }),
-    ...metrics.map((metric, index) =>
-      prisma.metricResult.create({
-        data: {
+  // One INSERT, not one per metric. Fourteen separate round trips to a pooled
+  // remote database took longer than Prisma's default 5 s transaction budget,
+  // and the commit then failed with P2028: a finished grade that never got
+  // written, which the student saw as a permanent spinner. A single
+  // `createMany` is one statement, and the timeout is generous enough that a
+  // slow link degrades instead of failing.
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.metricResult.deleteMany({ where: { evaluationId: evaluation.id } });
+      await tx.metricResult.createMany({
+        data: metrics.map((metric, index) => ({
           evaluationId: evaluation.id,
           name: metric.name,
           analyzer: metric.analyzer,
@@ -432,21 +525,22 @@ export async function runEvaluation(evaluationId) {
           evidence: stableEvidence(metric.evidence ?? {}),
           feedback: metric.feedback ?? '',
           ordinal: index,
+        })),
+      });
+      await tx.evaluation.update({
+        where: { id: evaluation.id },
+        data: {
+          status: partial ? 'PARTIAL' : 'SUCCEEDED',
+          stage: 'done',
+          gradeHundredths,
+          reportHash: reportView.hash,
+          failedReason,
+          finishedAt: new Date(),
         },
-      }),
-    ),
-    prisma.evaluation.update({
-      where: { id: evaluation.id },
-      data: {
-        status: partial ? 'PARTIAL' : 'SUCCEEDED',
-        stage: 'done',
-        gradeHundredths,
-        reportHash: reportView.hash,
-        failedReason,
-        finishedAt: new Date(),
-      },
-    }),
-  ]);
+      });
+    },
+    { timeout: 30_000, maxWait: 10_000 },
+  );
 
   return { evaluation: await loadEvaluation(evaluation.id), gradeHundredths, partial };
 }
@@ -475,13 +569,25 @@ const reportContent = (report) => ({
       ? { name: metric.name, analyzer: metric.analyzer, ordinal: metric.ordinal, weight: 0, score: 0, contribution: 0, status: metric.status }
       : metric,
   ),
+  // Model prose is advice, not evidence. Keeping it out of the hash is what
+  // lets two identical submissions hash identically whether or not a free tier
+  // answered, and whichever model answered.
+  llm: undefined,
+  recovery: report.recovery
+    ? {
+        logic_sound: report.recovery.logic_sound,
+        confidence: report.recovery.confidence,
+        max_credit: report.recovery.max_credit,
+        awarded_hundredths: report.recovery.awarded_hundredths,
+      }
+    : undefined,
 });
 
 /**
  * The report payload. Pure: same rows in, same bytes out. `timing`-class keys
  * are removed by `stableEvidence`, so the hash survives a cache-hot rerun.
  */
-export function buildReportView({ evaluation, submission, assignment, ruleset, rules, metrics, tests, fingerprint, partial, failedReason, capabilities }) {
+export function buildReportView({ evaluation, submission, assignment, ruleset, rules, metrics, tests, fingerprint, partial, failedReason, capabilities, recovery = null }) {
   const flags = {
     // Advisory (zero-weight) metrics are excluded: an unavailable LLM review is
     // not a reason to withhold a grade, and including it made the flag - and so
@@ -497,9 +603,15 @@ export function buildReportView({ evaluation, submission, assignment, ruleset, r
   const limitationKeys = new Set();
   if (!assignment.referenceSolution) limitationKeys.add('no_reference_solution');
   if (!tests.length) limitationKeys.add('no_tests');
-  if (metrics.some((metric) => metric.analyzer === 'llm_review' && metric.status === 'unavailable')) {
+  const llmMetrics = metrics.filter((metric) => String(metric.analyzer).startsWith('llm_'));
+  if (llmMetrics.some((metric) => metric.status === 'unavailable' || metric.status === 'error')) {
     limitationKeys.add('llm_unavailable');
   }
+  if (llmMetrics.some((metric) => metric.status === 'ok' || metric.status === 'partial')) {
+    limitationKeys.add('llm_advisory');
+  }
+  if (recovery?.awarded_hundredths) limitationKeys.add('llm_recovery_marks');
+  if (metrics.some((metric) => metric.analyzer === 'llm_plagiarism')) limitationKeys.add('llm_plagiarism_unverified');
   if (failedReason === 'compile_error') limitationKeys.add('compile_error');
   if (metrics.some((metric) => metric.evidence?.reason === 'provider_has_no_compiler_flags')) {
     limitationKeys.add('no_compiler_flags');
@@ -516,9 +628,30 @@ export function buildReportView({ evaluation, submission, assignment, ruleset, r
     .filter(([key]) => limitationKeys.has(key))
     .map(([, text]) => text);
 
+  // The advisory block the report UI renders. Every field is copied from the
+  // metric that produced it, so the report never invents an opinion of its own.
+  const pickLlm = (analyzer) => {
+    const metric = llmMetrics.find((item) => item.analyzer === analyzer);
+    return metric ? { status: metric.status, feedback: metric.feedback ?? '', evidence: metric.evidence ?? {} } : null;
+  };
+  const llmBlock = llmMetrics.length
+    ? {
+        available: llmMetrics.some((metric) => metric.status === 'ok'),
+        provider: llmMetrics.map((metric) => metric.evidence?.provider).find(Boolean) ?? null,
+        model: llmMetrics.map((metric) => metric.evidence?.model).find(Boolean) ?? null,
+        feedback: pickLlm('llm_feedback'),
+        readability: pickLlm('llm_style_review'),
+        originality: pickLlm('llm_plagiarism'),
+        recovery: pickLlm('llm_compile_recovery'),
+      }
+    : null;
+  const metricHundredths = metrics.reduce((sum, metric) => sum + metric.contribution, 0);
+  const totalHundredths = Math.max(0, Math.min(10_000, metricHundredths + (recovery?.awarded_hundredths ?? 0)));
+
   const report = {
-    schema_version: '2.0',
-    grader_version: GRADER_VERSION,
+    schema_version: '2.1',
+    // The grader that actually produced this report, not the one installed now.
+    grader_version: evaluation.graderVersion ?? GRADER_VERSION,
     evaluation: {
       id: evaluation.id,
       key: evaluation.evaluationKey,
@@ -547,8 +680,10 @@ export function buildReportView({ evaluation, submission, assignment, ruleset, r
       names: tests.map((test) => test.name),
     },
     grade: {
-      hundredths: Math.max(0, Math.min(10_000, metrics.reduce((sum, metric) => sum + metric.contribution, 0))),
-      percent: Math.round(metrics.reduce((sum, metric) => sum + metric.contribution, 0)) / 100,
+      hundredths: totalHundredths,
+      percent: Math.round(totalHundredths) / 100,
+      // Shown separately so a recovered mark is never mistaken for a test pass.
+      recovery_hundredths: recovery?.awarded_hundredths ?? 0,
     },
     metrics: metrics.map((metric, index) => ({
       name: metric.name,
@@ -562,6 +697,8 @@ export function buildReportView({ evaluation, submission, assignment, ruleset, r
       evidence: stableEvidence(metric.evidence ?? {}),
     })),
     flags,
+    llm: llmBlock,
+    recovery,
     toolchain: {
       provider: evaluation.provider,
       compiler_version: fingerprint?.compilerVersion ?? 'unknown',
@@ -623,6 +760,22 @@ export function renderReportText(view) {
     ...(report.flags.review_recommended.length ? [`Review recommended: ${report.flags.review_recommended.join(', ')}`] : []),
     ...(report.flags.suspected_infinite_loop ? ['Suspected infinite loop: an earlier test exceeded its time limit.'] : []),
     ...(report.flags.identical_copy ? ['Identical copy: an exact source match was found in this assignment.'] : []),
+    ...(report.recovery
+      ? [
+          '',
+          `Compile-error recovery  ${report.recovery.awarded_hundredths} / ${Math.round(report.recovery.max_credit * 10_000)} hundredths awarded`,
+          ...wrap(report.recovery.explanation ?? '', 96).map((line) => `  ${line}`),
+        ]
+      : []),
+    ...(report.llm
+      ? [
+          '',
+          'AI review (advisory, excluded from the report hash)',
+          ...Object.entries({ feedback: report.llm.feedback, readability: report.llm.readability, originality: report.llm.originality })
+            .filter(([, value]) => value?.feedback)
+            .map(([key, value]) => `  ${key}: ${value.feedback}`),
+        ]
+      : []),
     '',
     'Usefulness and limitations',
     ...wrap(report.usefulness ?? '', 96).map((line) => `  ${line}`),
@@ -667,13 +820,21 @@ export async function reportForEvaluation(evaluationId) {
     partial: evaluation.status === 'PARTIAL',
     failedReason: evaluation.failedReason,
     capabilities: capabilitiesFor(evaluation.provider),
+    recovery: evaluation.failedReason === 'compile_error' ? recoveryCreditFor({ metrics, rules }) : null,
   });
+
+  // A report is only re-verifiable against the analyzer set that produced it.
+  // After a grader upgrade an old row is neither verified nor tampered with, and
+  // saying "cannot be compared" is more honest than a red mismatch.
+  const sameGrader = (evaluation.graderVersion ?? GRADER_VERSION) === GRADER_VERSION;
 
   return {
     json: pdf.report,
     text: renderReportText(pdf),
     hash: pdf.hash,
     storedHash: evaluation.reportHash,
-    verified: evaluation.reportHash ? evaluation.reportHash === pdf.hash : false,
+    verified: sameGrader ? (evaluation.reportHash ? evaluation.reportHash === pdf.hash : false) : null,
+    verification_note: sameGrader ? null : `Graded by grader ${evaluation.graderVersion ?? 'unknown'}; its hash is comparable only with that analyzer set.`,
+    grader_version: evaluation.graderVersion ?? GRADER_VERSION,
   };
 }

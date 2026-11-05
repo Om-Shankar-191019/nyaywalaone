@@ -102,8 +102,15 @@ export function defaultRules(problem = 'add_two_integers') {
         name: 'readability_llm',
         analyzer: 'llm_review',
         weight: 0,
-        params: { model: 'llama-3.3-70b-versatile', temperature: 0, seed: 42, advisory_only: true },
+        params: { temperature: 0, advisory_only: true },
       },
+      // The four optional language-model checks. All weight 0: they add advice,
+      // never marks - except llm_compile_recovery, which the coordinator lets
+      // award its own capped credit when a program does not compile.
+      { name: 'feedback_llm', analyzer: 'llm_feedback', weight: 0, params: {} },
+      { name: 'style_llm', analyzer: 'llm_style_review', weight: 0, params: { strictness: 'normal' } },
+      { name: 'integrity_llm', analyzer: 'llm_plagiarism', weight: 0, params: {} },
+      { name: 'compile_recovery_llm', analyzer: 'llm_compile_recovery', weight: 0, params: { max_credit: 0.4 } },
     ],
   };
 }

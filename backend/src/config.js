@@ -103,9 +103,37 @@ const envSchema = z.object({
   /* -------------------------------------------------- week 2: grading engine */
   // The LLM is optional; without a key the metric is reported as unavailable
   // and the rule set's policy decides what that costs.
+  // The first model here is what the account on this machine actually has.
+  // `llama-3.3-70b-versatile` was retired for new keys and returned 404, which
+  // is why every report showed `llm_review: error`. Empty means "client picks".
   GROQ_API_KEY: z.string().optional().default(''),
   GROQ_BASE_URL: z.string().url().default('https://api.groq.com/openai/v1'),
-  GROQ_MODEL: z.string().optional().default('llama-3.3-70b-versatile'),
+  GROQ_MODEL: z.string().optional().default('openai/gpt-oss-20b'),
+
+  /* ------------------------------------------------------------------- llm */
+  // Master switch for every language-model metric. A rule set still decides
+  // which ones run; this decides whether the process may call out at all.
+  LLM_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  // Providers are tried in this order; one without a key is skipped.
+  LLM_PROVIDER_ORDER: z.string().optional().default('groq,gemini,openrouter,cerebras,mistral'),
+  LLM_TIMEOUT_MS: optionalNumber(z.coerce.number().int().min(2000).max(60000).default(20000)),
+
+  // Optional extra free providers. Any OpenAI-compatible endpoint works.
+  GEMINI_API_KEY: z.string().optional().default(''),
+  GEMINI_BASE_URL: z.string().url().default('https://generativelanguage.googleapis.com/v1beta/openai'),
+  GEMINI_MODEL: z.string().optional().default('gemini-2.5-flash'),
+  OPENROUTER_API_KEY: z.string().optional().default(''),
+  OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_MODEL: z.string().optional().default('meta-llama/llama-3.3-70b-instruct:free'),
+  CEREBRAS_API_KEY: z.string().optional().default(''),
+  CEREBRAS_BASE_URL: z.string().url().default('https://api.cerebras.ai/v1'),
+  CEREBRAS_MODEL: z.string().optional().default('llama-3.3-70b'),
+  MISTRAL_API_KEY: z.string().optional().default(''),
+  MISTRAL_BASE_URL: z.string().url().default('https://api.mistral.ai/v1'),
+  MISTRAL_MODEL: z.string().optional().default('mistral-small-latest'),
   GRADING_CONCURRENCY: optionalNumber(z.coerce.number().int().min(1).max(8).default(3)),
   // Day 23: provider calls allowed in flight, process-wide. onlinecompiler.io
   // accepts two at a time; Judge0 tolerates more.

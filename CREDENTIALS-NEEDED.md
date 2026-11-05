@@ -20,7 +20,7 @@ paste it into.
 | 1 | `DATABASE_URL` (pooled) + `DIRECT_URL` (direct) | **Yes** — the app will not boot without them | [Neon](https://console.neon.tech) → your project → **Connect** → *Connection string* (choose "Pooled" then "Direct") | `backend/.env` lines 7–8, and Vercel env vars |
 | 2 | `ACCESS_TOKEN_SECRET` | **Yes** — 32+ random characters | You generate it with the command below; no signup | `backend/.env`: `ACCESS_TOKEN_SECRET=""` |
 | 3 | `ONLINECOMPILER_API_KEY` | **Yes** — the default execution provider is keyed | [onlinecompiler.io](https://www.onlinecompiler.io/) → account → API key | `backend/.env`: `ONLINECOMPILER_API_KEY=` |
-| 4 | `GROQ_API_KEY` | No — only for the optional `llm_review` metric | [Groq](https://console.groq.com/keys) | `backend/.env`: `GROQ_API_KEY=` |
+| 4 | `GROQ_API_KEY` | No — only for the four optional language-model checks (feedback, readability, originality, compile-error recovery). Any one free provider works; see [docs/llm.md](docs/llm.md) | [Groq](https://console.groq.com/keys) · [Gemini](https://aistudio.google.com/apikey) · [OpenRouter](https://openrouter.ai/keys) · [Cerebras](https://cloud.cerebras.ai) · [Mistral](https://console.mistral.ai/api-keys) | `backend/.env`: `GROQ_API_KEY=` (or `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, …) |
 | 5 | `CRON_SECRET` | No — only for the queue drain endpoint | You generate it (any random string) | `backend/.env`: `CRON_SECRET=` |
 
 Optional extras, each explained below: `INSTRUCTOR_SIGNUP_CODE` (you choose) and

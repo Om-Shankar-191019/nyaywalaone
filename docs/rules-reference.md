@@ -197,18 +197,90 @@ Provider calls: 0.
 
 | Param | Default | Meaning |
 |---|---|---|
-| `model` | `"llama-3.3-70b-versatile"` | Groq model id |
+| `model` | unset | Optional model id; the client picks one the account has |
 | `temperature` | `0` | |
-| `seed` | `42` | |
+| `seed` | `42` | Forwarded to providers that honour a seed |
+| `strictness` | `"normal"` | `light` / `normal` / `strict` |
 | `advisory_only` | `true` | weight should be 0 |
 | `max_source_chars` | `6000` | source truncation |
 
-Without `GROQ_API_KEY` this metric reports `unavailable` and the report gains
-`llm_unavailable`. Because it has weight 0, it cannot change a grade, and its
-free text is excluded from the report hash (see
-[reproducibility.md](reproducibility.md)).
+Without a key this metric reports `unavailable` (shown as *not run*) and the
+report gains `llm_unavailable`. A provider failure is never `error`: a retired
+model name used to turn every report red, so the client now walks a chain of
+models and providers and reports `unavailable` when none answers. Because it
+has weight 0, it cannot change a grade, and its free text is excluded from the
+report hash (see [reproducibility.md](reproducibility.md)).
 
-Provider calls: 0 sandbox calls; 1 HTTP call to Groq.
+Provider calls: 0 sandbox calls; 1 HTTP call.
+
+---
+
+## `llm_feedback` — the paragraph a student reads
+
+| Param | Default | Meaning |
+|---|---|---|
+| `model` | unset | Optional override |
+| `temperature` | `0` | |
+| `max_metrics` | `14` | metrics included in the digest |
+| `max_source_chars` | `6000` | source truncation |
+
+Runs **after** the deterministic metrics (`needsMetrics`), because it joins them
+up. Returns `summary`, `strengths`, `improvements`, `next_steps` in evidence and
+uses the summary as its feedback line. `score` is always 0: advice never moves a
+mark. 1 HTTP call, sequential after the first pass.
+
+---
+
+## `llm_style_review` — readability rubric
+
+| Param | Default | Meaning |
+|---|---|---|
+| `model` | unset | Optional override |
+| `strictness` | `"normal"` | `light` / `normal` / `strict` |
+| `max_source_chars` | `6000` | source truncation |
+
+Scores naming, formatting, comments, structure and error handling out of 10 with
+a sentence each, plus up to four concrete issues. `score = overall / 10`.
+`runsWithoutBinary: true`, so it still reviews a file that does not compile.
+Advisory (weight 0) in both shipped rule sets; an instructor may weight it.
+1 HTTP call.
+
+---
+
+## `llm_plagiarism` — AI / internet copy signals
+
+| Param | Default | Meaning |
+|---|---|---|
+| `review_threshold` | `0.6` | combined likelihood that triggers `review_recommended` |
+| `max_source_chars` | `6000` | source truncation |
+
+Two parts. Deterministic, key-free signals (`markdown_fence`, `assistant_prose`,
+`tutorial_comments`, `smart_punctuation`, `mixed_naming`, `placeholder`, …) always
+run; the model's separate judgement of "looks generated" and "looks copied" is
+discounted 15% and combined with `max`, so either kind of evidence can flag and
+neither can suppress the other. Verdicts: `likely_original`, `inconclusive`,
+`review_recommended`, `strong_signal` — never a finding of misconduct. No live
+web search is performed (`web_lookup: not_configured`). Status is `partial` when
+only the heuristics ran. `runsWithoutBinary: true`. 1 HTTP call.
+
+---
+
+## `llm_compile_recovery` — marks for a program that never ran
+
+| Param | Default | Meaning |
+|---|---|---|
+| `max_credit` | `0.40` | ceiling on recovered marks (0.05–0.60) |
+| `require_logic_correct` | `true` | no credit unless the logic looks sound |
+| `show_corrected_source` | `true` | include a compiling version in the report |
+| `max_source_chars` | `6000` | source truncation |
+
+Runs only when the program did not compile (`onCompileFailure`). Explains each
+compiler error, judges the intended logic, and returns a confidence. The
+coordinator awards `confidence × max_credit` hundredths and reports them as
+`grade.recovery_hundredths` plus a `recovery` block. Weight is 0: the credit is
+added directly, so a compile error still costs at least 60% by default. 1 HTTP
+call. The recovered marks are the only model output that can reach the report
+hash.
 
 ---
 

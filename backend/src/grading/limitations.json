@@ -5,8 +5,11 @@
   "entries": {
     "no_reference_solution": "No reference solution is set, so edge cases are checked for well-formed output only.",
     "no_tests": "No test cases are attached to this assignment, so correctness and edge cases are unmeasured.",
-    "llm_unavailable": "The optional language-model review is not configured or not enabled for this rule set.",
-    "compile_error": "The program did not compile; every metric except syntax is reported as unavailable.",
+    "llm_unavailable": "At least one language-model check did not run: no API key is configured, the free tier was exhausted, or every provider was unreachable. The grade is unaffected because these metrics carry no weight.",
+    "llm_advisory": "Language-model observations are advice, not measurements. They are excluded from the report hash and cannot move a mark in the shipped rule sets.",
+    "llm_recovery_marks": "Part of this grade comes from a language-model reading of a program that never compiled, not from executed tests. It is capped by the rule set and shown separately.",
+    "llm_plagiarism_unverified": "Originality was judged from code style and the local class corpus; no live internet search was performed, so a signal is a reason to look rather than a finding.",
+    "compile_error": "The program did not compile; every metric except syntax is reported as unavailable, and any marks awarded come from the compile-error recovery review.",
     "no_compiler_flags": "The sandbox compiles with a fixed command line and cannot be given compiler flags, so the rule set's -Wall/-Wextra diagnostics were not available. Errors are still detected.",
     "provider_limits": "The sandbox fixes its own memory and process ceilings, so the rule set's memory and process limits were not enforced.",
     "no_peers": "No other submissions existed when originality was measured, so that score is provisional.",
