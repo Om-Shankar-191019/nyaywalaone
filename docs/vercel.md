@@ -115,7 +115,7 @@ the API origin and add the page's origin to `EXTRA_ALLOWED_ORIGINS` on the backe
 | `/api/exec/smoke` returns 404 | `EXEC_SMOKE_ENABLED=false` in production — by design | leave it off in production; use it locally |
 | `/api/internal/drain` returns 404 | `CRON_SECRET` is empty — by design | set it and send `X-Cron-Secret` or `Authorization: Bearer` |
 | `500 INTERNAL_ERROR` on the first submit, log says `Unknown argument 'stage'` | the committed Prisma client is older than `schema.prisma` | `cd backend && npx prisma generate`, commit the regenerated client; `postinstall` now does it on every deploy |
-| Every submission stays `queued` | nothing is draining the queue: no cron, or `CRON_SECRET` missing | confirm the cron line in `vercel.json` and that `/api/internal/drain` answers 200 with the secret |
+| Every submission stays `queued` | nothing is draining the queue: the in-process kick died with the invocation and no page is polling | keep the student page open (its poll claims the row), or call `/api/internal/drain` with the secret |
 
 ---
 
@@ -167,19 +167,34 @@ process dies. Two mechanisms do it:
    three attempts the row becomes `FAILED` with `retries_exhausted: …`, so the
    cohort view shows a failure instead of a spinner.
 
-`vercel.json` schedules it every minute. Vercel Cron authenticates with
-`Authorization: Bearer $CRON_SECRET`, which the route accepts alongside
-`X-Cron-Secret`.
+**Three drivers, no paid scheduler.** A per-minute cron is a Pro-only plan
+feature - on Hobby it fails the whole deployment with *"Hobby accounts are
+limited to daily cron jobs"* - so the queue is driven by ordinary requests
+instead:
 
-**Plan limits matter here.** Per-minute schedules are a Pro feature; Hobby
-deployments only get daily crons. On Hobby, either:
+1. **The in-process kick** right after a submission answers `202`. It is the
+   normal path on a long-lived server and a best effort on Vercel, where the
+   response ends the invocation.
+2. **The request that watches the grade.** `POST /api/submissions/:id/grade`
+   (authenticated: the student who owns the row, or the instructor) claims that
+   row with a single atomic `UPDATE` and grades it, and the student's poll calls
+   it on every tick while the run is not terminal. Batch grading is advanced the
+   same way: `POST /api/grading/advance` grades one queued row, and the cohort
+   view calls it on each progress poll that still sees `queued > 0`. A claim that
+   loses the race answers `claimed: false` in one query, so overlap costs
+   nothing.
+3. **The daily cron.** `vercel.json` schedules `/api/internal/drain` at
+   `0 0 * * *`, the once-a-day schedule Hobby allows, as the last resort for a
+   row nothing else picked up. Vercel Cron authenticates with
+   `Authorization: Bearer $CRON_SECRET`, which the route accepts alongside
+   `X-Cron-Secret`.
 
-- point an external scheduler (GitHub Actions, cron-job.org) at
-  `/api/internal/drain?limit=2` every minute with the header, or
-- accept that grading is driven by the in-process kick and that a crashed run is
-  picked up the next day.
+This is why no page needs to stay open for a grade to be *correct*: the daily
+drain and the next request from anyone still pick the row up. Keeping the page
+open just makes it fast. A plan with per-minute cron can raise the schedule back
+to `* * * * *` and nothing else changes.
 
-Keep the per-tick `limit` at 1-2 on Vercel: a function has 60 seconds, and two
+Keep per-tick work at 1-2 rows on Vercel: a function has 60 seconds, and two
 graded submissions is already ~16 provider calls.
 
 Check it without a browser:

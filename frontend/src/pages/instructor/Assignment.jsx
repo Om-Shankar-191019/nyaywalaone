@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Download, FlaskConical, ListChecks, Scale, ScrollText, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { api } from '../../api/client.js';
 import { ErrorState } from '../../components/states.jsx';
@@ -380,6 +380,21 @@ function CohortPanel({ assignmentId, onChanged }) {
   });
 
   const progress = progressQuery.data;
+
+  // Day 24: the cohort view also advances the queue. A per-minute cron is a
+  // Pro-only plan feature, so the poll that watches these counters is what keeps
+  // them moving - one row per tick, and the claim is atomic on the server.
+  const advancing = useRef(false);
+  useEffect(() => {
+    if (!progress?.counts.queued || advancing.current) return;
+    advancing.current = true;
+    api
+      .post('/grading/advance', { limit: 1 })
+      .catch(() => {})
+      .finally(() => {
+        advancing.current = false;
+      });
+  }, [progress]);
 
   const gradeAll = useMutation({
     mutationFn: () => api.post(`/assignments/${assignmentId}/grade-all`, { includeFailed: true, start: true }),

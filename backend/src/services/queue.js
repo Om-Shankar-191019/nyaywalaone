@@ -52,6 +52,35 @@ export async function claimNextEvaluation() {
   return rows[0]?.id ?? null;
 }
 
+/**
+ * Claim one named row, under exactly the rules `claimNextEvaluation` uses.
+ *
+ * This is how the queue is driven on a serverless host: a request that is
+ * already authenticated for the submission (the student polling their own
+ * grade, or the instructor opening it) claims and grades the row itself,
+ * instead of asking a per-minute scheduler - a plan-gated feature - to do it.
+ * Postgres still arbitrates, so a poll racing the in-process kick, another
+ * invocation or the daily drain cannot grade the same row twice; a loser gets
+ * `null` and one query's worth of work.
+ */
+export async function claimEvaluationById(evaluationId) {
+  const interval = `${STALE_CLAIM_MINUTES} minutes`;
+  const rows = await prisma.$queryRaw`
+    UPDATE "evaluations" AS e
+    SET status = 'RUNNING'::"EvaluationStatus",
+        stage = 'queued',
+        claimed_at = now(),
+        attempt_count = e.attempt_count + 1
+    WHERE e.id = ${evaluationId}::uuid
+      AND (
+        status = 'QUEUED'
+        OR (status = 'RUNNING' AND claimed_at IS NOT NULL AND claimed_at < now() - ${interval}::interval)
+      )
+    RETURNING e.id
+  `;
+  return rows[0]?.id ?? null;
+}
+
 const shortReason = (error) => String(error?.code ?? error?.message ?? error ?? 'grading_failed').slice(0, 200);
 
 /**

@@ -10,7 +10,7 @@ import { prepareEvaluationKey, reportForEvaluation, runEvaluation } from '../gra
 import { resolveRules } from '../grading/rules.js';
 import { createRateLimiter } from '../lib/rateLimit.js';
 import { reviewMatch, scanAssignment } from '../grading/similarity-scan.js';
-import { drain, queueDepth } from '../services/queue.js';
+import { claimEvaluationById, drain, processClaimedEvaluation, queueDepth } from '../services/queue.js';
 import {
   canSeeReport,
   createSubmissionRecord,
@@ -94,6 +94,40 @@ submissionsRouter.post(
       },
       202,
     );
+  }),
+);
+
+/* ------------------------------------------------------- grade a queued row */
+
+/**
+ * Drive the queue from a request that already has permission to see the row.
+ *
+ * A submission answers 202 and grades off the request path, which is right for
+ * the student. On Vercel that response also ends the invocation, so the
+ * in-process kick that starts the grade is a best effort, and the per-minute
+ * cron that used to cover the rest is a Pro-only plan feature. This endpoint is
+ * the replacement: the poll that watches a grade also claims it.
+ *
+ * The claim is one atomic UPDATE, so a poll that loses to the kick, to another
+ * invocation or to the daily drain answers `claimed: false` after a single
+ * query instead of grading the same file twice. Only the status is echoed back:
+ * a grade stays invisible until it is released, exactly as on the read routes.
+ */
+submissionsRouter.post(
+  '/submissions/:id/grade',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { submission } = await loadSubmissionForViewer(assertUuid(req.params.id), req.user);
+    const evaluation = await latestEvaluation(submission.id);
+    if (!evaluation) throw notFound('No evaluation exists for this submission yet');
+
+    const claimedId = await claimEvaluationById(evaluation.id);
+    if (!claimedId) {
+      return send(res, { claimed: false, status: evaluation.status, stage: evaluation.stage ?? 'queued' }, 202);
+    }
+
+    const result = await processClaimedEvaluation(claimedId);
+    return send(res, { claimed: true, status: result.status });
   }),
 );
 

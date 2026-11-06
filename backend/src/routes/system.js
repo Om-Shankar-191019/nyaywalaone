@@ -191,6 +191,26 @@ const drainHandler = asyncHandler(async (req, res) => {
 systemRouter.post('/internal/drain', drainHandler);
 systemRouter.get('/internal/drain', drainHandler);
 
+/**
+ * One step of the queue, driven by the page that is watching it.
+ *
+ * The per-minute cron this replaces is a Pro-only Vercel feature, so batch
+ * grading is advanced by the instructor's cohort view: every progress poll that
+ * still sees `queued > 0` asks for one more row. The claim is `FOR UPDATE SKIP
+ * LOCKED`, so overlapping asks - or one racing a student's own submission -
+ * cannot grade the same row twice, and a request that finds nothing to do
+ * answers immediately.
+ */
+systemRouter.post(
+  '/grading/advance',
+  requireAuth,
+  requireRole('INSTRUCTOR'),
+  asyncHandler(async (req, res) => {
+    const limit = z.coerce.number().int().min(1).max(2).default(1).parse(req.body?.limit ?? 1);
+    return send(res, await drain({ limit, concurrency: 1 }));
+  }),
+);
+
 /** Queue depth and age, for the cohort progress chip and for monitoring. */
 systemRouter.get(
   '/meta/queue',

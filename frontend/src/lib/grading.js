@@ -58,6 +58,32 @@ const BACKOFF = 1.35;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * One kick per submission at a time. The request either grades the row or is
+ * refused in a single query, but a graded run takes a few seconds, so piling
+ * kicks on every tick would only queue work behind the one already running.
+ */
+const kicksInFlight = new Set();
+
+/**
+ * The poll is also the worker's alarm clock.
+ *
+ * On Vercel the response ends the invocation, so the server-side kick that
+ * starts grading right after a submit is a best effort - and the per-minute
+ * cron that used to cover the rest is a Pro-only plan feature. This asks the API
+ * to claim and grade the row while the student is watching it. The claim is
+ * atomic, so a second tab, the submit-time kick or the daily drain winning the
+ * race is a cheap no-op rather than a second grade.
+ */
+function kickGrading(submissionId) {
+  if (kicksInFlight.has(submissionId)) return;
+  kicksInFlight.add(submissionId);
+  api
+    .post(`/submissions/${submissionId}/grade`)
+    .catch(() => {})
+    .finally(() => kicksInFlight.delete(submissionId));
+}
+
+/**
  * Polls one submission until its evaluation reaches a terminal state.
  *
  * Three rules from the plan are enforced here rather than in the component:
@@ -122,6 +148,9 @@ export function useGradingPoll() {
         error: null,
       });
 
+      // Before the first wait: the grade starts now, not after a round trip.
+      kickGrading(submissionId);
+
       while (!token.cancelled) {
         await sleep(delay);
         if (token.cancelled) return;
@@ -143,6 +172,10 @@ export function useGradingPoll() {
             token.cancelled = true;
             return;
           }
+
+          // Still moving: nudge the queue again. If a run is already in flight
+          // the server says so at once, so this costs one small request.
+          kickGrading(submissionId);
 
           // Keep asking. A grade is a compile, a handful of analyzers and a few
           // model calls; a fixed deadline only produced a message the student
